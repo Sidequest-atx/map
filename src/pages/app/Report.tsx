@@ -4,6 +4,7 @@ import { classifyHazardPhoto, type ClassificationResult } from "../../ai/classif
 import { findDuplicates, likelyDuplicate, type DuplicateMatch } from "../../ai/dedup";
 import { SevBadge } from "../../components/Bits";
 import { Camera, Check, Upload } from "../../components/Icons";
+import { Motif } from "../../components/Motif";
 import { toast } from "../../components/Toast";
 import { PLACES } from "../../data/places";
 import { useSession } from "../../data/session";
@@ -175,7 +176,8 @@ export default function Report() {
     const target = merged ? getStore().get(submitted.duplicateOf!) : submitted;
     const path = fixPath(submitted.type);
     return (
-      <div className="done">
+      <div className="done has-motif">
+        <Motif kind="lip" opacity={0.12} style={{ color: "var(--olive-800)" }} />
         <div className="done-check" aria-hidden>
           <Check />
         </div>

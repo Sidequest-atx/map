@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { DemoBadge } from "../components/Bits";
 import { Car, Check, Dedup, Rank, Scan, Verify } from "../components/Icons";
+import { Motif } from "../components/Motif";
 import { useReports } from "../data/store";
 import { fmtInt } from "../lib/format";
 import { staticMapUrl } from "../lib/mapbox";
@@ -23,7 +24,9 @@ export default function Mission() {
 
   return (
     <>
-      <section className="hero">
+      <section className="hero has-motif">
+        <Motif kind="crack" opacity={0.14} />
+        <Motif kind="panels" opacity={0.09} />
         <div className="wrap">
           <div className="reveal">
             <h1 className="display">
@@ -194,7 +197,8 @@ export default function Mission() {
         </div>
       </section>
 
-      <section className="section section--band">
+      <section className="section section--band has-motif">
+        <Motif kind="branch" opacity={0.1} style={{ color: "var(--olive-800)" }} />
         <div className="wrap stack stack--lg">
           <div className="split">
             <h2 className="h2">Why this needs computer vision, not a chatbot.</h2>
@@ -284,7 +288,8 @@ export default function Mission() {
         </div>
       </section>
 
-      <section className="section section--dark">
+      <section className="section section--dark has-motif">
+        <Motif kind="root" opacity={0.12} />
         <div className="wrap split">
           <div className="drives-explainer">
             <h2 className="h2">
@@ -343,7 +348,8 @@ export default function Mission() {
         </div>
       </section>
 
-      <section className="section section--band promise-band">
+      <section className="section section--band promise-band has-motif">
+        <Motif kind="lip" opacity={0.14} style={{ color: "var(--olive-800)" }} />
         <div className="wrap stack stack--lg">
           <p>No one's grandmother should be injured by a sidewalk a photograph could have fixed.</p>
           <div className="btn-row" style={{ justifyContent: "center" }}>

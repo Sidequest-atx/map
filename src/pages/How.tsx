@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
 import { Lifecycle } from "../components/Bits";
+import { Motif } from "../components/Motif";
 
 export default function How() {
   return (
     <>
-      <section className="section">
+      <section className="section has-motif">
+        <Motif kind="crack" opacity={0.12} style={{ color: "var(--olive-800)" }} />
         <div className="wrap split">
           <h1 className="h1">How a sidewalk gets fixed here.</h1>
           <p className="lede">
@@ -111,7 +113,8 @@ export default function How() {
         </div>
       </section>
 
-      <section className="section section--band">
+      <section className="section section--band has-motif">
+        <Motif kind="root" opacity={0.12} style={{ color: "var(--olive-800)" }} />
         <div className="wrap stack stack--lg">
           <div className="split">
             <h2 className="h2">Who does what.</h2>

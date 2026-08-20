@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { priorityLabel, rankReport } from "../ai/rank";
 import { DemoBadge, SevBadge } from "../components/Bits";
 import { Download } from "../components/Icons";
+import { Motif } from "../components/Motif";
 import { NEIGHBORHOODS, NETWORK_MILES } from "../data/places";
 import { useDrives, useReports } from "../data/store";
 import { exportCsv, exportGeoJSON } from "../lib/export";
@@ -69,7 +70,8 @@ export default function Data() {
 
   return (
     <>
-      <section className="section">
+      <section className="section has-motif">
+        <Motif kind="branch" opacity={0.12} style={{ color: "var(--olive-800)" }} />
         <div className="wrap split">
           <div className="stack">
             <h1 className="h1">Open data.</h1>

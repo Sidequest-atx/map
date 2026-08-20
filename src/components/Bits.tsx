@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { Motif } from "./Motif";
 import { allDemo, useReports } from "../data/store";
 import { HAZARD_SHORT, SEVERITY_LABELS, STATUS_LABELS, type HazardReport, type HazardType, type ReportStatus, type Severity } from "../types";
 
@@ -59,7 +60,8 @@ export function NotFound() {
   const { pathname } = useLocation();
   const inApp = pathname.startsWith("/app");
   return (
-    <div className="errorpage ui">
+    <div className="errorpage ui has-motif">
+      <Motif kind="crack" opacity={0.12} style={{ color: "var(--olive-800)" }} />
       <div>
         <h1 className="h2">That page does not exist.</h1>
         <p className="muted">

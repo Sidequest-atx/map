@@ -2985,3 +2985,73 @@ dialog.sheet-dialog[open] {
     width: 4in;
   }
 }
+
+/* ---------- Sidewalk motifs ---------- */
+.has-motif {
+  position: relative;
+  overflow: clip;
+}
+.has-motif > .wrap,
+.has-motif > .app-home,
+.has-motif > .done,
+.has-motif > div {
+  position: relative;
+  z-index: 1;
+}
+.motif {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  color: currentColor;
+}
+.motif--crack {
+  right: -6%;
+  top: -8%;
+  width: min(70vw, 900px);
+  height: auto;
+  aspect-ratio: 3 / 2;
+}
+.motif--panels {
+  left: 50%;
+  bottom: -2%;
+  transform: translateX(-50%);
+  width: min(120vw, 1400px);
+  aspect-ratio: 8 / 3;
+  mask-image: linear-gradient(to top, black 0%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, black 0%, transparent 100%);
+}
+.motif--root {
+  left: -4%;
+  bottom: -10%;
+  width: min(60vw, 760px);
+  aspect-ratio: 2 / 1;
+}
+.motif--lip {
+  right: -12%;
+  bottom: -6%;
+  width: min(70vw, 900px);
+  aspect-ratio: 5 / 2;
+  mask-image: linear-gradient(to right, transparent 0%, black 35%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 35%);
+}
+.motif--branch {
+  right: -4%;
+  top: 4%;
+  width: min(40vw, 420px);
+  aspect-ratio: 1;
+}
+@media (max-width: 720px) {
+  .motif--crack {
+    width: 120vw;
+    right: -30%;
+  }
+  .motif--root,
+  .motif--lip {
+    width: 90vw;
+  }
+}
+@media (prefers-reduced-transparency: reduce), print {
+  .motif {
+    display: none;
+  }
+}

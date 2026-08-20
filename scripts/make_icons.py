@@ -10,7 +10,7 @@ OCHRE = (194, 138, 45)
 OLIVE_LIGHT = (168, 196, 106)
 
 
-def mark(size: int, padding: float = 0.0, radius: float = 0.22) -> Image.Image:
+def mark(size: int, padding: float = 0.0, radius: float = 0.25) -> Image.Image:
     """Draw the 64-unit mark scaled to `size` px. padding is a fraction for maskable icons."""
     s = 8  # supersample
     W = size * s
@@ -25,15 +25,19 @@ def mark(size: int, padding: float = 0.0, radius: float = 0.22) -> Image.Image:
     def P(x, y):
         return (off + x * u, off + y * u)
 
-    # left panel (flat), right panel (lifted)
-    d.polygon([P(10, 40), P(30, 40), P(30, 46), P(10, 46)], fill=FIELD)
-    d.polygon([P(30, 36), P(54, 36), P(54, 42), P(30, 42)], fill=FIELD)
-    d.line([P(30, 36), P(30, 46)], fill=OCHRE, width=int(3 * u))
-    # pin
-    cx, cy, r = 42, 20, 10
-    d.ellipse([P(cx - r, cy - r), P(cx + r, cy + r)], fill=OLIVE_LIGHT)
-    d.polygon([P(cx - 8.6, cy + 5), P(cx + 8.6, cy + 5), P(cx, cy + 16)], fill=OLIVE_LIGHT)
-    d.ellipse([P(cx - 3.5, cy - 3.5), P(cx + 3.5, cy + 3.5)], fill=OLIVE_DEEP)
+    # two panels, right one lifted, drawn as round-capped bars
+    def bar(x1, y, x2, w):
+        d.line([P(x1, y), P(x2, y)], fill=FIELD, width=int(w * u))
+        r = w * u / 2
+        for cx in (x1, x2):
+            px, py = P(cx, y)
+            d.ellipse([px - r, py - r, px + r, py + r], fill=FIELD)
+
+    bar(12, 41, 33, 7)
+    bar(33, 33, 52, 7)
+    px, py = P(33, 19)
+    r = 4.5 * u
+    d.ellipse([px - r, py - r, px + r, py + r], fill=OLIVE_LIGHT)
     return img.resize((size, size), Image.LANCZOS)
 
 

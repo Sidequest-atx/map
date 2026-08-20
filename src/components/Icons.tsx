@@ -13,11 +13,10 @@ const base = {
 
 export const Mark = (p: P) => (
   <svg viewBox="0 0 64 64" aria-hidden {...p}>
-    <rect width="64" height="64" rx="14" fill="currentColor" opacity="0.12" />
-    <path d="M10 40h20v6H10zM30 36h24v6H30z" fill="currentColor" />
-    <path d="M30 36v10" stroke="#c28a2d" strokeWidth="3" strokeLinecap="round" />
-    <path d="M42 10c-6 0-10 4.5-10 10 0 7 10 16 10 16s10-9 10-16c0-5.5-4-10-10-10z" fill="currentColor" />
-    <circle cx="42" cy="20" r="3.5" fill="var(--field, #ece6d6)" />
+    <rect width="64" height="64" rx="16" fill="currentColor" opacity="0.14" />
+    <line x1="12" y1="41" x2="33" y2="41" stroke="currentColor" strokeWidth="7" strokeLinecap="round" />
+    <line x1="33" y1="33" x2="52" y2="33" stroke="currentColor" strokeWidth="7" strokeLinecap="round" />
+    <circle cx="33" cy="19" r="4.5" fill="#a8c46a" />
   </svg>
 );
 

@@ -1,0 +1,22 @@
+{
+  "name": "SideQuest ATX",
+  "short_name": "SideQuest",
+  "description": "Photograph sidewalk hazards in Austin. AI classifies them; the community tracks them until they are fixed.",
+  "id": "/app",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ece6d6",
+  "theme_color": "#37412a",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Report a hazard", "url": "/app/report", "description": "Photograph a sidewalk hazard" },
+    { "name": "Start a Quest Drive", "url": "/app/drive", "description": "Passenger-seat batch capture" }
+  ]
+}

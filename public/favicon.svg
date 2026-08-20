@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#37412a"/>
+  <!-- two sidewalk panels, the right one lifted: the hazard we exist for -->
+  <path d="M10 40 L30 40 L30 46 L10 46 Z" fill="#ece6d6"/>
+  <path d="M30 36 L54 36 L54 42 L30 42 Z" fill="#ece6d6"/>
+  <path d="M30 36 L30 46" stroke="#c28a2d" stroke-width="3" stroke-linecap="round"/>
+  <!-- pin -->
+  <path d="M42 10 c-6 0 -10 4.5 -10 10 c0 7 10 16 10 16 s10 -9 10 -16 c0 -5.5 -4 -10 -10 -10z" fill="#a8c46a"/>
+  <circle cx="42" cy="20" r="3.5" fill="#37412a"/>
+</svg>

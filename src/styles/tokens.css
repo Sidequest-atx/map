@@ -1,0 +1,86 @@
+/* SideQuest ATX design tokens
+   Palette: committed olive on a visibly tinted beige field.
+   Light theme only (used outdoors in Texas sun and at a city desk). */
+
+:root {
+  /* Field + surfaces */
+  --field: oklch(0.93 0.025 90);
+  --field-2: oklch(0.895 0.03 92);
+  --field-3: oklch(0.86 0.035 92);
+  --surface: oklch(0.975 0.012 92);
+  --line: oklch(0.80 0.03 95);
+  --line-strong: oklch(0.68 0.035 100);
+
+  /* Olive ramp */
+  --olive-50: oklch(0.92 0.045 118);
+  --olive-100: oklch(0.86 0.06 120);
+  --olive-200: oklch(0.78 0.08 121);
+  --olive-400: oklch(0.63 0.10 122);
+  --olive-500: oklch(0.55 0.10 122);
+  --olive-600: oklch(0.47 0.09 123);
+  --olive-800: oklch(0.32 0.06 125);
+  --olive-900: oklch(0.25 0.045 125);
+
+  /* Ink */
+  --ink: oklch(0.22 0.02 110);
+  --ink-soft: oklch(0.42 0.03 110);
+  --ink-mute: oklch(0.55 0.03 105);
+  --ink-on-dark: oklch(0.95 0.02 95);
+  --ink-on-dark-soft: oklch(0.82 0.035 100);
+
+  /* Semantic */
+  --sev-low: var(--olive-500);
+  --sev-moderate: oklch(0.68 0.14 75);
+  --sev-severe: oklch(0.52 0.17 35);
+  --ok: oklch(0.50 0.11 150);
+  --info: oklch(0.50 0.07 230);
+  --danger: var(--sev-severe);
+
+  --sev-low-bg: oklch(0.90 0.05 120);
+  --sev-moderate-bg: oklch(0.92 0.06 80);
+  --sev-severe-bg: oklch(0.91 0.05 35);
+  --ok-bg: oklch(0.91 0.05 150);
+  --info-bg: oklch(0.92 0.03 230);
+
+  /* Type */
+  --font-serif: "Literata", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Radii */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1); /* out-quint */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 150ms;
+  --dur: 220ms;
+  --dur-slow: 420ms;
+
+  /* Z scale */
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-sheet: 30;
+  --z-backdrop: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+
+  /* Shadows: shallow, olive-tinted */
+  --shadow-1: 0 1px 2px oklch(0.25 0.04 120 / 0.10);
+  --shadow-2: 0 4px 8px -2px oklch(0.25 0.04 120 / 0.14);
+  --shadow-sheet: 0 -6px 16px -8px oklch(0.25 0.04 120 / 0.25);
+
+  /* Layout */
+  --content: 72rem;
+  --prose: 66ch;
+  --gutter: clamp(1rem, 4vw, 2.5rem);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  --topbar-h: 3.75rem;
+
+  color-scheme: light;
+}

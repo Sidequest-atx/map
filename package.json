@@ -1,0 +1,26 @@
+{
+  "name": "sidequest-atx",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Map every broken sidewalk in Austin. Community-powered hazard reporting so no one's grandmother is injured by a sidewalk a photograph could have fixed.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "mapbox-gl": "^3.28.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2"
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.16",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}

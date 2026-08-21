@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:site": "vite --port 3001 --strictPort",
+    "dev:app": "cross-env VITE_SURFACE=app vite --port 3002 --strictPort"
   },
   "dependencies": {
     "mapbox-gl": "^3.28.1",
@@ -20,6 +22,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
+    "cross-env": "^10.1.0",
     "typescript": "^7.0.2",
     "vite": "^8.2.2"
   }

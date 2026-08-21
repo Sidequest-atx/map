@@ -1,6 +1,6 @@
 import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import { NotFound, PageLoading } from "./components/Bits";
 import { RequireRole } from "./components/RequireRole";
 import { AppLayout } from "./layouts/AppLayout";
@@ -23,7 +23,7 @@ const router = createBrowserRouter([
   {
     element: <SiteLayout />,
     children: [
-      { path: "/", element: S(<Mission />) },
+      { path: "/", element: import.meta.env.VITE_SURFACE === "app" ? <Navigate to="/app" replace /> : S(<Mission />) },
       { path: "/map", element: S(<MapExplorer />) },
       { path: "/how", element: S(<How />) },
       { path: "/data", element: S(<Data />) },

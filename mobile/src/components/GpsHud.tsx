@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { LiveGps } from "../lib/location";
 import { C, TONE_COLOR, accuracyTone } from "../theme";
@@ -9,6 +9,16 @@ import { C, TONE_COLOR, accuracyTone } from "../theme";
  * us coarse location. Shown on every capture surface.
  */
 export function GpsHud({ gps, compact }: { gps: LiveGps; compact?: boolean }) {
+  // The panel only re-renders when a fix arrives, so if the GPS goes quiet (a garage, a
+  // tunnel, a denied upgrade) the "N s old" warning would never appear: the pill would
+  // keep claiming a fresh fix. Tick once a second so staleness surfaces on its own.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!gps.best) return;
+    const t = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [gps.best]);
+
   const acc = gps.best?.accuracyM ?? gps.fix?.accuracyM ?? null;
   const tone = gps.status === "locked" ? accuracyTone(acc) : "none";
   const color = TONE_COLOR[tone];

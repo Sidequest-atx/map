@@ -69,11 +69,23 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
+      # The macos-15 image defaults to Xcode 16.4 (Swift 6.1), and Expo SDK 57's
+      # ExpoModulesJSI SwiftPM package declares swift-tools 6.2, so the xcframework build
+      # phase dies with "package 'apple' is using Swift tools version 6.2.0 but the
+      # installed version is 6.1.0". Xcode 26 is on the image; select the newest one.
       - name: Toolchain
         run: |
           set -euo pipefail
-          ls -d /Applications/Xcode*.app || true
+          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE" ]; then
+            echo "::error::No Xcode 26 on this runner; Expo SDK 57 needs Swift tools 6.2"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          echo "DEVELOPER_DIR=$XCODE/Contents/Developer" >> "$GITHUB_ENV"
           xcodebuild -version
+          swift --version || true
           pod --version
 
       - name: Install
@@ -83,13 +95,6 @@ jobs:
       - name: Prebuild iOS project
         working-directory: mobile
         run: npx expo prebuild --platform ios --no-install --clean
-
-      - name: Cache CocoaPods
-        uses: actions/cache@v4
-        with:
-          path: mobile/ios/Pods
-          key: pods-${{ runner.os }}-${{ hashFiles('mobile/package-lock.json') }}
-          restore-keys: pods-${{ runner.os }}-
 
       - name: Install CocoaPods
         working-directory: mobile/ios

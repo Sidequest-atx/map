@@ -25,7 +25,7 @@ touches CI, so it does not care that the June Apple cookie expired.
 ```powershell
 cd C:\Users\james\Projects\sidequest-atx
 gh workflow run "iOS unsigned IPA" -f note=phone
-gh run watch                                    # about 25 minutes
+gh run watch                                     # ~4 min of checks, then ~7 min on the Mac
 gh run download --name SideQuestATX-unsigned-<run>-phone --dir "$HOME\Downloads\SideQuest-ipa"
 ```
 
@@ -35,9 +35,20 @@ signs for a year. The app asks for no paid-tier entitlements (no push, no associ
 groups), and `UIBackgroundModes: location` is an Info.plist key rather than an entitlement, so the
 Glasses Walk trail still records under free provisioning.
 
-Cost note: macOS runner minutes bill at 10x on a private repo, so a build spends roughly 250 of the
-free plan's 2,000 monthly minutes. The workflow is manual-dispatch only for that reason, and the
-typecheck and Metro bundle run first on a Linux runner so a broken build never reaches the Mac.
+Cost note: macOS runner minutes bill at 10x on a private repo, so a 7-minute build spends about 70
+of the free plan's 2,000 monthly minutes. The workflow is manual-dispatch only for that reason, and
+the typecheck and Metro bundle run first on a Linux runner so a broken bundle never reaches the Mac.
+
+Two things in that workflow are load-bearing and will look strange later:
+
+- **Xcode is chosen, not defaulted.** The image defaults to 16.4, whose Swift is 6.1, and
+  ExpoModulesJSI's SwiftPM manifest asks for tools 6.2. Xcode 26.0 and 26.1 then fail on `weak let`
+  in expo-modules-jsi. Only 26.2 and 26.3 get through, and the step tries them in that order.
+- **expo-modules-jsi is patched before prebuild.** It annotates the two `RuntimeScheduler`
+  constructors with `SWIFT_RETURNS_RETAINED`, which every Xcode 26 clang rejects: a constructor does
+  not return, so the attribute never applied. The class still declares `SWIFT_SHARED_REFERENCE` and
+  Swift imports a foreign reference type's constructors at +1 regardless, so removing it changes no
+  ownership behaviour. The step no-ops once Expo drops the attribute.
 
 ### 2. TestFlight through EAS (when you want it on other people's phones)
 

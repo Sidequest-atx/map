@@ -73,49 +73,34 @@ jobs:
       # ExpoModulesJSI SwiftPM package declares swift-tools 6.2, so the xcframework build
       # phase dies with "package 'apple' is using Swift tools version 6.2.0 but the
       # installed version is 6.1.0". Xcode 26 is on the image; select the newest one.
-      # Expo SDK 57 needs an exact Swift band, and the runner carries eleven Xcodes:
-      #   - image default 16.4 (Swift 6.1): ExpoModulesJSI's SwiftPM manifest declares
-      #     swift-tools 6.2, so package resolution fails outright.
-      #   - Xcode 26.3 (Swift 6.3): SWIFT_RETURNS_RETAINED on a type that is not a
-      #     SWIFT_SHARED_REFERENCE became an error rather than a warning, and
-      #     expo-modules-jsi's RuntimeScheduler.h does exactly that.
-      # So take the newest Xcode that still ships Swift 6.2, and print the whole matrix
-      # so the next mismatch is one glance away.
-      # Expo SDK 57 needs an exact Swift band, and the runner carries eleven Xcodes:
-      #   - image default 16.4 (Swift 6.1): ExpoModulesJSI's SwiftPM manifest declares
-      #     swift-tools 6.2, so package resolution fails outright.
-      #   - Xcode 26.3 (Swift 6.3): SWIFT_RETURNS_RETAINED on a type that is not a
-      #     SWIFT_SHARED_REFERENCE became an error rather than a warning, and
-      #     expo-modules-jsi's RuntimeScheduler.h does exactly that.
-      # Take the newest Xcode that still reports Swift 6.2, probing the toolchain binary
-      # (Contents/Developer/usr/bin/swift is not present in every image). If the probe
-      # comes back empty, fall back to the newest known-good version by name.
+      # Expo SDK 57 is picky about the toolchain and the runner carries eleven Xcodes:
+      #   - image default 16.4: ExpoModulesJSI's SwiftPM manifest declares swift-tools 6.2,
+      #     so package resolution fails before anything compiles.
+      #   - Xcode 26.3: clang rejects SWIFT_RETURNS_RETAINED on the RuntimeScheduler
+      #     constructors in expo-modules-jsi (57.0.6 still ships them), so the xcframework
+      #     will not build. Every Xcode 26.x reports "Apple Swift version 6.2", so the Swift
+      #     version cannot tell them apart.
+      # Publish the 26.x line newest-first and let the archive step walk it; the failure is
+      # early and cheap, so one run finds the newest Xcode that actually compiles.
       - name: Toolchain
         run: |
           set -uo pipefail
-          PICK=""
-          for X in /Applications/Xcode_26*.app; do
-            [ -d "$X" ] || continue
-            SWIFTC="$X/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift"
-            OUT=$("$SWIFTC" --version 2>/dev/null) || OUT=""
-            SW=$(printf '%s' "$OUT" | sed -n 's/.*Apple Swift version //p' | cut -d' ' -f1 | cut -d. -f1,2 | tail -1)
-            echo "  $(basename "$X") -> Swift ${SW:-unknown}"
-            if [ "$SW" = "6.2" ]; then PICK="$X"; fi
-          done
-          if [ -z "$PICK" ]; then
-            for FALLBACK in /Applications/Xcode_26.1.1.app /Applications/Xcode_26.1.app /Applications/Xcode_26.0.1.app /Applications/Xcode_26.0.app; do
-              if [ -d "$FALLBACK" ]; then PICK="$FALLBACK"; break; fi
+          CANDIDATES=""
+          for V in 26.2 26.1 26.0; do
+            for X in "/Applications/Xcode_$V.app" "/Applications/Xcode_$V.0.app" "/Applications/Xcode_$V.1.app"; do
+              if [ -d "$X" ]; then CANDIDATES="$CANDIDATES $X"; break; fi
             done
-            echo "::warning::Swift probe found no 6.2; falling back to ${PICK:-nothing} by name"
-          fi
-          if [ -z "$PICK" ]; then
-            echo "::error::No usable Xcode 26 on this runner (Expo SDK 57 needs Swift 6.2)"
+          done
+          if [ -z "$CANDIDATES" ]; then
+            echo "::error::No Xcode 26.0-26.2 on this runner"
             ls -d /Applications/Xcode*.app || true
             exit 1
           fi
-          echo "Using $(basename "$PICK")"
-          sudo xcode-select -s "$PICK/Contents/Developer"
-          echo "DEVELOPER_DIR=$PICK/Contents/Developer" >> "$GITHUB_ENV"
+          echo "Candidates:$CANDIDATES"
+          echo "XCODE_CANDIDATES=$CANDIDATES" >> "$GITHUB_ENV"
+          FIRST=$(echo $CANDIDATES | cut -d' ' -f1)
+          sudo xcode-select -s "$FIRST/Contents/Developer"
+          echo "DEVELOPER_DIR=$FIRST/Contents/Developer" >> "$GITHUB_ENV"
           xcodebuild -version
           pod --version
 
@@ -134,24 +119,31 @@ jobs:
       - name: Archive without signing
         working-directory: mobile/ios
         run: |
-          set -euo pipefail
+          set -uo pipefail
           WORKSPACE=$(ls -d *.xcworkspace | head -1)
           SCHEME=$(basename "$WORKSPACE" .xcworkspace)
           echo "workspace=$WORKSPACE scheme=$SCHEME"
-          set -o pipefail
-          xcodebuild \
-            -workspace "$WORKSPACE" \
-            -scheme "$SCHEME" \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGN_ENTITLEMENTS="" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
-            build | tee xcodebuild.log | (xcpretty || cat)
+          OK=""
+          for X in $XCODE_CANDIDATES; do
+            echo "::group::xcodebuild under $(basename "$X")"
+            rm -rf build
+            DEVELOPER_DIR="$X/Contents/Developer" xcodebuild               -workspace "$WORKSPACE"               -scheme "$SCHEME"               -configuration Release               -sdk iphoneos               -destination 'generic/platform=iOS'               -derivedDataPath build               CODE_SIGNING_ALLOWED=NO               CODE_SIGNING_REQUIRED=NO               CODE_SIGN_IDENTITY=""               CODE_SIGN_ENTITLEMENTS=""               PROVISIONING_PROFILE_SPECIFIER=""               build > xcodebuild.log 2>&1
+            RC=$?
+            echo "::endgroup::"
+            if [ "$RC" -eq 0 ]; then
+              echo "Built with $(basename "$X")"
+              OK="$X"
+              break
+            fi
+            echo "::warning::$(basename "$X") failed (exit $RC); trying the next Xcode"
+            grep -E " error: " xcodebuild.log | head -10 || true
+            cp xcodebuild.log "xcodebuild-$(basename "$X").log" || true
+          done
+          if [ -z "$OK" ]; then
+            echo "no Xcode on this runner could build the app"
+            tail -120 xcodebuild.log
+            exit 1
+          fi
           APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)
           test -d "$APP" || { echo "no .app produced"; tail -200 xcodebuild.log; exit 1; }
           # Sideloadly re-signs, but a leftover embedded profile confuses some sideloaders.
@@ -175,6 +167,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: xcodebuild-log-${{ github.run_number }}
-          path: mobile/ios/xcodebuild.log
+          path: |
+            mobile/ios/xcodebuild.log
+            mobile/ios/xcodebuild-Xcode_*.log
           if-no-files-found: ignore
           retention-days: 7

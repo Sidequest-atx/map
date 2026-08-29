@@ -34,7 +34,7 @@ export function ensureDirs(): void {
 export class JsonDoc<T> {
   private file: File;
   private cache: T | undefined;
-  constructor(name: string, private fallback: () => T) {
+  constructor(private name: string, private fallback: () => T) {
     this.file = new File(ROOT, name);
   }
   read(): T {
@@ -54,12 +54,30 @@ export class JsonDoc<T> {
     this.cache = this.fallback();
     return this.cache;
   }
+  /**
+   * Write a sibling file and move it into place. expo-file-system writes strings with
+   * `atomically: false` (FileSystemFile.swift), so a save interrupted by the OS killing
+   * the app leaves a half-written file, and a half-written reports.json means every
+   * report on the phone is gone at the next launch. The photos would survive as orphans.
+   */
   write(value: T): void {
     ensureDirs();
     this.cache = value;
+    const json = JSON.stringify(value);
+    try {
+      const tmp = new File(ROOT, `${this.name}.tmp`);
+      if (tmp.exists) tmp.delete();
+      tmp.create({ intermediates: true });
+      tmp.write(json);
+      tmp.moveSync(new File(ROOT, this.name), { overwrite: true });
+      this.file = new File(ROOT, this.name);
+      return;
+    } catch (e) {
+      console.warn("[fs] atomic write failed; writing in place", this.name, e);
+    }
     try {
       if (!this.file.exists) this.file.create({ intermediates: true });
-      this.file.write(JSON.stringify(value));
+      this.file.write(json);
     } catch (e) {
       console.warn("[fs] write", this.file.uri, e);
     }
@@ -68,6 +86,8 @@ export class JsonDoc<T> {
     this.cache = undefined;
     try {
       if (this.file.exists) this.file.delete();
+      const tmp = new File(ROOT, `${this.name}.tmp`);
+      if (tmp.exists) tmp.delete();
     } catch {
       /* ignore */
     }

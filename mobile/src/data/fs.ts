@@ -37,21 +37,26 @@ export class JsonDoc<T> {
   constructor(private name: string, private fallback: () => T) {
     this.file = new File(ROOT, name);
   }
+  private static parse<V>(f: File): { value: V } | null {
+    try {
+      if (!f.exists) return null;
+      const raw = f.textSync();
+      return raw ? { value: JSON.parse(raw) as V } : null;
+    } catch (e) {
+      console.warn("[fs] read", f.uri, e);
+      return null;
+    }
+  }
+
   read(): T {
     if (this.cache !== undefined) return this.cache;
     ensureDirs();
-    try {
-      if (this.file.exists) {
-        const raw = this.file.textSync();
-        if (raw) {
-          this.cache = JSON.parse(raw) as T;
-          return this.cache;
-        }
-      }
-    } catch (e) {
-      console.warn("[fs] read", this.file.uri, e);
-    }
-    this.cache = this.fallback();
+    // move() deletes the destination before renaming it, so a kill in that instant
+    // leaves only the sibling holding the full contents. Prefer the real file; accept
+    // a leftover .tmp rather than falling back to an empty ledger.
+    const hit =
+      JsonDoc.parse<T>(this.file) ?? JsonDoc.parse<T>(new File(ROOT, `${this.name}.tmp`));
+    this.cache = hit ? hit.value : this.fallback();
     return this.cache;
   }
   /**

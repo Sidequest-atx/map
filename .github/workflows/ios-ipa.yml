@@ -86,13 +86,13 @@ jobs:
         run: |
           set -uo pipefail
           CANDIDATES=""
-          for V in 26.2 26.1 26.0; do
+          for V in 26.2 26.3; do
             for X in "/Applications/Xcode_$V.app" "/Applications/Xcode_$V.0.app" "/Applications/Xcode_$V.1.app"; do
               if [ -d "$X" ]; then CANDIDATES="$CANDIDATES $X"; break; fi
             done
           done
           if [ -z "$CANDIDATES" ]; then
-            echo "::error::No Xcode 26.0-26.2 on this runner"
+            echo "::error::No Xcode 26.2 or 26.3 on this runner"
             ls -d /Applications/Xcode*.app || true
             exit 1
           fi
@@ -107,6 +107,30 @@ jobs:
       - name: Install
         working-directory: mobile
         run: npm ci --no-audit --no-fund
+
+      # expo-modules-jsi 57.0.5 (and 57.0.6) annotate the RuntimeScheduler constructors
+      # with SWIFT_RETURNS_RETAINED. Every Xcode 26 clang on this image rejects that:
+      # "cannot be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED
+      # because it is not returning a SWIFT_SHARED_REFERENCE type" — a constructor does not
+      # return, so the attribute never applied. The class itself still carries
+      # SWIFT_SHARED_REFERENCE(retainRuntimeScheduler, releaseRuntimeScheduler) and Swift
+      # imports a foreign reference type's constructors at +1 regardless, so dropping the
+      # attribute changes no ownership behaviour. Remove when upstream drops it.
+      - name: Patch expo-modules-jsi for Xcode 26 clang
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          H=node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h
+          test -f "$H"
+          BEFORE=$(grep -c "SWIFT_RETURNS_RETAINED RuntimeScheduler(" "$H" || true)
+          if [ "$BEFORE" = "0" ]; then
+            echo "Nothing to patch; upstream looks fixed."
+            exit 0
+          fi
+          sed -i '' 's/SWIFT_RETURNS_RETAINED RuntimeScheduler(/RuntimeScheduler(/' "$H"
+          AFTER=$(grep -c "SWIFT_RETURNS_RETAINED RuntimeScheduler(" "$H" || true)
+          grep -q "SWIFT_SHARED_REFERENCE(retainRuntimeScheduler" "$H"
+          echo "Removed $BEFORE constructor annotations, $AFTER left; shared-reference marker intact."
 
       - name: Prebuild iOS project
         working-directory: mobile

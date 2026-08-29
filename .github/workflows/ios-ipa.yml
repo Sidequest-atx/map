@@ -81,19 +81,35 @@ jobs:
       #     expo-modules-jsi's RuntimeScheduler.h does exactly that.
       # So take the newest Xcode that still ships Swift 6.2, and print the whole matrix
       # so the next mismatch is one glance away.
+      # Expo SDK 57 needs an exact Swift band, and the runner carries eleven Xcodes:
+      #   - image default 16.4 (Swift 6.1): ExpoModulesJSI's SwiftPM manifest declares
+      #     swift-tools 6.2, so package resolution fails outright.
+      #   - Xcode 26.3 (Swift 6.3): SWIFT_RETURNS_RETAINED on a type that is not a
+      #     SWIFT_SHARED_REFERENCE became an error rather than a warning, and
+      #     expo-modules-jsi's RuntimeScheduler.h does exactly that.
+      # Take the newest Xcode that still reports Swift 6.2, probing the toolchain binary
+      # (Contents/Developer/usr/bin/swift is not present in every image). If the probe
+      # comes back empty, fall back to the newest known-good version by name.
       - name: Toolchain
         run: |
           set -uo pipefail
           PICK=""
           for X in /Applications/Xcode_26*.app; do
             [ -d "$X" ] || continue
-            OUT=$("$X/Contents/Developer/usr/bin/swift" --version 2>/dev/null) || OUT=""
+            SWIFTC="$X/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift"
+            OUT=$("$SWIFTC" --version 2>/dev/null) || OUT=""
             SW=$(printf '%s' "$OUT" | sed -n 's/.*Apple Swift version //p' | cut -d' ' -f1 | cut -d. -f1,2 | tail -1)
             echo "  $(basename "$X") -> Swift ${SW:-unknown}"
             if [ "$SW" = "6.2" ]; then PICK="$X"; fi
           done
           if [ -z "$PICK" ]; then
-            echo "::error::No Xcode with Swift 6.2 on this runner (Expo SDK 57 needs it)"
+            for FALLBACK in /Applications/Xcode_26.1.1.app /Applications/Xcode_26.1.app /Applications/Xcode_26.0.1.app /Applications/Xcode_26.0.app; do
+              if [ -d "$FALLBACK" ]; then PICK="$FALLBACK"; break; fi
+            done
+            echo "::warning::Swift probe found no 6.2; falling back to ${PICK:-nothing} by name"
+          fi
+          if [ -z "$PICK" ]; then
+            echo "::error::No usable Xcode 26 on this runner (Expo SDK 57 needs Swift 6.2)"
             ls -d /Applications/Xcode*.app || true
             exit 1
           fi

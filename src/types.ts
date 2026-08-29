@@ -11,7 +11,8 @@ export type Severity = "low" | "moderate" | "severe";
 
 export type ReportStatus = "open" | "submitted-311" | "scheduled" | "resolved";
 
-export type ReportSource = "walk" | "drive";
+/** walk = phone in hand · drive = passenger-seat Quest Drive · glasses = Glasses Walk (mobile app) */
+export type ReportSource = "walk" | "drive" | "glasses";
 
 export type Role = "public" | "reporter" | "drive-captain" | "moderator";
 

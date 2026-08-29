@@ -20,7 +20,7 @@ create table if not exists public.reports (
   type text not null check (type in ('crack','lifted','vegetation','missing-ramp','missing-sidewalk','debris','other')),
   severity text not null check (severity in ('low','moderate','severe')),
   status text not null default 'open' check (status in ('open','submitted-311','scheduled','resolved')),
-  source text not null default 'walk' check (source in ('walk','drive')),
+  source text not null default 'walk' check (source in ('walk','drive','glasses')),
   lng double precision not null,
   lat double precision not null,
   place text not null,

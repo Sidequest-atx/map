@@ -37,6 +37,10 @@ A React + TypeScript + Vite single-page app with two faces:
 
 One person drives, one captures from the passenger seat. `/app/drive` opens the rear camera, captures a frame every 5 or 10 seconds (or on tap) with a GPS breadcrumb trail, then batch-classifies, deduplicates, and presents a review list before anything reaches the map. A simulated drive (procedural frames along Anderson Mill Rd) runs on desktops or when the camera is denied. The queue is persisted locally so an interrupted drive can be resumed.
 
+### Phone app (`mobile/`)
+
+The PWA cannot lock a GPS fix to the shutter, write coordinates into the photo, or record a trail with the screen off. `mobile/` is the native iPhone app that can (Expo SDK 57, shipped through EAS to TestFlight). Same types, same dedup and ranking math, same rules (no after-photo, no "resolved"). Three capture modes: **Report** (GPS locked at the shutter, EXIF-tagged JPEG, draggable pin with the accuracy ring, saved to a "SideQuest ATX" Photos album), **Quest Drive**, and **Glasses Walk**, where Meta glasses (or any camera without GPS) take the pictures and the phone in your pocket records the trail they get placed on. Local-first; exports GeoJSON/CSV. See `mobile/README.md` for the build and TestFlight checklist.
+
 ## Run it
 
 ```bash
@@ -57,8 +61,9 @@ To test the camera on a phone over LAN you need HTTPS: `npm run dev -- --host` p
 
 ## Roadmap
 
-- [ ] Supabase backend + real accounts (schema ready)
-- [ ] Fine-tuned sidewalk vision model behind `VITE_AI_ENDPOINT`
+- [x] Native iPhone capture app with GPS-at-shutter, EXIF-tagged photos, and Glasses Walk (`mobile/`)
+- [ ] Supabase backend + real accounts (schema ready; phone exports merge into it)
+- [ ] Fine-tuned sidewalk vision model behind `VITE_AI_ENDPOINT` / `EXPO_PUBLIC_AI_ENDPOINT`
 - [ ] Austin 311 API hand-off instead of manual ticket entry
 - [ ] Printable door-hanger per vegetation report (sample on `/how`)
 - [ ] Ingest the City's sidewalk inventory for true coverage miles

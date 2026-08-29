@@ -1,0 +1,144 @@
+name: iOS unsigned IPA
+
+# Builds mobile/ as an UNSIGNED .ipa on a macOS runner, so the phone build does not
+# depend on an interactive Apple sign-in. James re-signs and installs it with Sideloadly
+# (free Apple ID = 7-day signing, 3 apps; paid = 1 year). No certificates, no
+# provisioning profiles, and no Apple session ever live in CI.
+#
+# The app asks for no paid-tier entitlements (no push, no associated domains, no app
+# groups); UIBackgroundModes "location" is an Info.plist key, so the Glasses Walk trail
+# still runs under free provisioning.
+#
+# Cost: macOS minutes bill at 10x on a private repo. The cheap checks run on Ubuntu (1x)
+# and gate the macOS job, so a broken bundle never reaches the expensive runner. Manual
+# dispatch only, on purpose: a 25-minute macOS build costs ~250 of the free plan's 2,000
+# monthly minutes, so it must never fire on an ordinary push.
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: Why this build (shown in the artifact name)
+        required: false
+        default: manual
+
+concurrency:
+  group: ios-ipa
+  cancel-in-progress: true
+
+env:
+  EXPO_NO_TELEMETRY: '1'
+  CI: '1'
+
+jobs:
+  checks:
+    name: Typecheck and bundle (cheap runner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install
+        working-directory: mobile
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        working-directory: mobile
+        run: npx tsc --noEmit
+      - name: Config introspects
+        working-directory: mobile
+        run: npx expo config --type introspect --json > /dev/null
+      - name: Metro bundles for iOS
+        working-directory: mobile
+        run: npx expo export --platform ios --output-dir dist-ci
+
+  build:
+    name: Archive unsigned IPA
+    needs: checks
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Toolchain
+        run: |
+          set -euo pipefail
+          ls -d /Applications/Xcode*.app || true
+          xcodebuild -version
+          pod --version
+
+      - name: Install
+        working-directory: mobile
+        run: npm ci --no-audit --no-fund
+
+      - name: Prebuild iOS project
+        working-directory: mobile
+        run: npx expo prebuild --platform ios --no-install --clean
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: mobile/ios/Pods
+          key: pods-${{ runner.os }}-${{ hashFiles('mobile/package-lock.json') }}
+          restore-keys: pods-${{ runner.os }}-
+
+      - name: Install CocoaPods
+        working-directory: mobile/ios
+        run: pod install --repo-update
+
+      - name: Archive without signing
+        working-directory: mobile/ios
+        run: |
+          set -euo pipefail
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          echo "workspace=$WORKSPACE scheme=$SCHEME"
+          set -o pipefail
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            build | tee xcodebuild.log | (xcpretty || cat)
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)
+          test -d "$APP" || { echo "no .app produced"; tail -200 xcodebuild.log; exit 1; }
+          # Sideloadly re-signs, but a leftover embedded profile confuses some sideloaders.
+          rm -f "$APP/embedded.mobileprovision"
+          rm -rf Payload SideQuestATX-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry SideQuestATX-unsigned.ipa Payload
+          ls -la SideQuestATX-unsigned.ipa
+          unzip -l SideQuestATX-unsigned.ipa | head -20
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: SideQuestATX-unsigned-${{ github.run_number }}-${{ inputs.note || 'push' }}
+          path: mobile/ios/SideQuestATX-unsigned.ipa
+          retention-days: 30
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log-${{ github.run_number }}
+          path: mobile/ios/xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 7

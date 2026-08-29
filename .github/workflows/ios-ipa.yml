@@ -120,14 +120,32 @@ jobs:
         working-directory: mobile/ios
         run: |
           set -uo pipefail
+          # GitHub runs this block with `bash -e`, so a failed attempt would kill the step
+          # before the loop could try the next Xcode.
+          set +e
           WORKSPACE=$(ls -d *.xcworkspace | head -1)
           SCHEME=$(basename "$WORKSPACE" .xcworkspace)
           echo "workspace=$WORKSPACE scheme=$SCHEME"
           OK=""
           for X in $XCODE_CANDIDATES; do
             echo "::group::xcodebuild under $(basename "$X")"
-            rm -rf build
-            DEVELOPER_DIR="$X/Contents/Developer" xcodebuild               -workspace "$WORKSPACE"               -scheme "$SCHEME"               -configuration Release               -sdk iphoneos               -destination 'generic/platform=iOS'               -derivedDataPath build               CODE_SIGNING_ALLOWED=NO               CODE_SIGNING_REQUIRED=NO               CODE_SIGN_IDENTITY=""               CODE_SIGN_ENTITLEMENTS=""               PROVISIONING_PROFILE_SPECIFIER=""               build > xcodebuild.log 2>&1
+            # Derive into ios/derived, never ios/build: pod install writes React Native's
+            # codegen output to ios/build/generated, and clearing it between attempts costs
+            # you safeareacontext-generated.mm and friends.
+            rm -rf derived
+            DEVELOPER_DIR="$X/Contents/Developer" xcodebuild \
+              -workspace "$WORKSPACE" \
+              -scheme "$SCHEME" \
+              -configuration Release \
+              -sdk iphoneos \
+              -destination 'generic/platform=iOS' \
+              -derivedDataPath derived \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGN_ENTITLEMENTS="" \
+              PROVISIONING_PROFILE_SPECIFIER="" \
+              build > xcodebuild.log 2>&1
             RC=$?
             echo "::endgroup::"
             if [ "$RC" -eq 0 ]; then
@@ -136,15 +154,15 @@ jobs:
               break
             fi
             echo "::warning::$(basename "$X") failed (exit $RC); trying the next Xcode"
-            grep -E " error: " xcodebuild.log | head -10 || true
-            cp xcodebuild.log "xcodebuild-$(basename "$X").log" || true
+            grep -E "error:" xcodebuild.log | head -10
+            cp xcodebuild.log "xcodebuild-$(basename "$X").log"
           done
           if [ -z "$OK" ]; then
             echo "no Xcode on this runner could build the app"
             tail -120 xcodebuild.log
             exit 1
           fi
-          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)
+          APP=$(find derived/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)
           test -d "$APP" || { echo "no .app produced"; tail -200 xcodebuild.log; exit 1; }
           # Sideloadly re-signs, but a leftover embedded profile confuses some sideloaders.
           rm -f "$APP/embedded.mobileprovision"

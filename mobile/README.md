@@ -30,10 +30,13 @@ gh run download --name SideQuestATX-unsigned-<run>-phone --dir "$HOME\Downloads\
 ```
 
 Then Sideloadly: plug the phone in, drag `SideQuestATX-unsigned.ipa` in, enter the Apple ID, install.
-A free Apple ID signs for 7 days and allows 3 sideloaded apps at a time; the paid developer account
-signs for a year. The app asks for no paid-tier entitlements (no push, no associated domains, no app
-groups), and `UIBackgroundModes: location` is an Info.plist key rather than an entitlement, so the
-Glasses Walk trail still records under free provisioning.
+Sideloadly's own history on this PC (`%LOCALAPPDATA%\Sideloadly\installations.db`) records the last
+two installs, Spotify and Sundial, with a 365-day TTL and their bundle ids left intact, so this Apple
+ID is on the paid developer program: SideQuest installs as `com.sidequestatx.app`, lasts a year, and
+the three-app free-account limit does not apply. (On a free Apple ID it would be 7 days and 3 apps.)
+Either way the app asks for no paid-tier entitlements (no push, no associated domains, no app groups),
+and `UIBackgroundModes: location` is an Info.plist key rather than an entitlement, so the Glasses Walk
+trail records under free provisioning too.
 
 Cost note: macOS runner minutes bill at 10x on a private repo, so a 7-minute build spends about 70
 of the free plan's 2,000 monthly minutes. The workflow is manual-dispatch only for that reason, and

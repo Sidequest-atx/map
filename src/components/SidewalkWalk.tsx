@@ -128,27 +128,112 @@ function Barricade({ id }: { id: string }) {
   );
 }
 
-/* Wear is the default state of this walk. Hand-placed between the story
-   scenes, thinning to nothing after the fresh panel near the end. */
-const CRACK_PATHS = [
-  "M-26 -4 L-15 -1 L-4 -7 L7 -2 L17 -6 L26 -2 M-4 -7 L-8 -18",
-  "M26 6 L15 9 L5 3 L-3 8 M5 3 L1 -8",
-  "M-5 -36 L-1 -16 L-8 2 L-2 20 L-7 38 M-8 2 L-19 9",
-  "M-26 -18 L-13 -11 L-8 2 L-12 14",
-];
-const CRACKS: [number, number, boolean][] = [
-  [0.045, 0, false], [0.075, 2, true], [0.115, 1, false], [0.148, 3, false],
-  [0.222, 0, true], [0.248, 2, false], [0.298, 1, true],
-  [0.375, 0, false], [0.408, 2, true], [0.44, 3, false], [0.455, 1, false],
-  [0.545, 0, false], [0.578, 2, true], [0.612, 1, false],
-  [0.688, 3, true], [0.715, 0, false], [0.748, 2, false],
-  [0.832, 1, true], [0.862, 0, false],
+/* Wear is the default state of this walk. Cracks are grown with a seeded
+   random walk — many short segments, small heading jitter, shallow hairline
+   branches — because real concrete fractures meander; a few straight
+   segments meeting at wide angles reads as a chemistry diagram instead. */
+function rng(seed: number) {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function crackShape(seed: number, span = 50) {
+  const r = rng(seed);
+  let x = -span / 2;
+  let y = (r() - 0.5) * 22;
+  let a = (r() - 0.5) * 0.5;
+  const clamp = (v: number) => Math.max(-23, Math.min(23, v));
+  let main = `M${x.toFixed(1)} ${y.toFixed(1)}`;
+  const branches: string[] = [];
+  const steps = 13 + Math.floor(r() * 6);
+  for (let i = 0; i < steps; i++) {
+    a = Math.max(-0.9, Math.min(0.9, a + (r() - 0.5) * 0.6));
+    const len = 2.4 + r() * 3.4;
+    x += Math.cos(a) * len;
+    y = clamp(y + Math.sin(a) * len);
+    main += ` L${x.toFixed(1)} ${y.toFixed(1)}`;
+    if (r() < 0.16 && branches.length < 3) {
+      let bx = x;
+      let by = y;
+      let ba = a + (r() < 0.5 ? 1 : -1) * (0.5 + r() * 0.5);
+      let b = `M${bx.toFixed(1)} ${by.toFixed(1)}`;
+      const bs = 3 + Math.floor(r() * 4);
+      for (let j = 0; j < bs; j++) {
+        ba += (r() - 0.5) * 0.5;
+        const bl = 1.6 + r() * 2.2;
+        bx += Math.cos(ba) * bl;
+        by = clamp(by + Math.sin(ba) * bl);
+        b += ` L${bx.toFixed(1)} ${by.toFixed(1)}`;
+      }
+      branches.push(b);
+    }
+  }
+  return { main, branches };
+}
+
+function Crack({ seed, rot = 0, o = 0.62, span }: { seed: number; rot?: number; o?: number; span?: number }) {
+  const c = crackShape(seed, span);
+  return (
+    <g transform={rot ? `rotate(${rot})` : undefined} opacity={o}>
+      <path d={c.main} fill="none" stroke="var(--line-strong)" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
+      {c.branches.map((b, i) => (
+        <path key={i} d={b} fill="none" stroke="var(--line-strong)" strokeWidth="0.85" strokeLinejoin="round" strokeLinecap="round" />
+      ))}
+    </g>
+  );
+}
+
+/** A tuft of weeds pushing up through a seam. Blades fan from one point. */
+function Weed({ s = 1 }: { s?: number }) {
+  return (
+    <g transform={`scale(${s})`}>
+      <path
+        d="M0 0 C -1 -3, -3 -5, -5.5 -7 M0 0 C -0.5 -4, -1.2 -7, -2 -10 M0 0 C 0.4 -4, 1 -7, 2.5 -9.5 M0 0 C 1 -3, 3 -5, 5 -6 M0 0 C 0.1 -3, -0.4 -6, 0.6 -8"
+        fill="none"
+        stroke="var(--olive-500)"
+        strokeWidth="1.1"
+        strokeLinecap="round"
+        opacity="0.75"
+      />
+    </g>
+  );
+}
+
+/** A panel lifted out of plane: slight rotation, shadow line on the low lip. */
+function Heave({ tilt }: { tilt: number }) {
+  return (
+    <g transform={`rotate(${tilt})`}>
+      <rect x="-24" y="-26" width="48" height="30" fill="var(--surface)" stroke="var(--line)" strokeWidth="1.2" />
+      <path d="M-24 4 L24 4" stroke="var(--olive-900)" strokeWidth="3" opacity="0.28" strokeLinecap="round" />
+    </g>
+  );
+}
+
+const CRACKS: [number, number, number][] = [
+  // [fraction, seed, rotation] — rotation 90 runs the crack along the walk
+  [0.045, 11, 0], [0.075, 23, 90], [0.115, 37, 0], [0.148, 41, 0],
+  [0.222, 53, 0], [0.248, 67, 90], [0.298, 71, 0],
+  [0.375, 83, 0], [0.408, 89, 90], [0.44, 97, 0], [0.455, 103, 0],
+  [0.545, 109, 0], [0.578, 113, 90], [0.612, 127, 0],
+  [0.688, 131, 0], [0.715, 137, 0], [0.748, 139, 90],
+  [0.832, 149, 0], [0.862, 151, 0],
 ];
 const CHIPS: [number, number][] = [
   [0.06, 1], [0.155, -1], [0.235, 1], [0.43, -1], [0.53, 1], [0.705, -1], [0.845, 1],
 ];
 const STAINS: [number, number, number][] = [
   [0.1, 46, 0.07], [0.255, 58, 0.1], [0.395, 44, 0.06], [0.565, 52, 0.09], [0.72, 40, 0.06], [0.86, 48, 0.08],
+];
+const HEAVES: [number, number][] = [[0.09, 2.2], [0.42, -2.6], [0.6, 2], [0.755, -2.2]];
+const WEEDS: [number, number, number][] = [
+  // [fraction, side, scale] — at the edge seam, blades leaning outward
+  [0.05, 1, 1], [0.125, -1, 1.2], [0.235, 1, 0.9], [0.315, -1, 1.1],
+  [0.435, 1, 1], [0.555, -1, 1.25], [0.63, 1, 0.85], [0.735, -1, 1.1], [0.815, 1, 0.95],
 ];
 
 export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
@@ -254,23 +339,20 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
               <Manhole r={7} />
             </Scene>
 
-            {/* everyday wear: stained panels, cracks, chipped-off edges */}
+            {/* everyday wear: stains, lifted panels, cracks, chips, weeds */}
             {STAINS.map(([f, len, o], i) => (
               <Scene key={`st${i}`} pts={pts} f={f}>
                 <rect x={-RIBBON / 2 + 2} y={-len / 2} width={RIBBON - 4} height={len} fill="var(--olive-800)" opacity={o} />
               </Scene>
             ))}
-            {CRACKS.map(([f, v, flip], i) => (
+            {HEAVES.map(([f, tilt], i) => (
+              <Scene key={`hv${i}`} pts={pts} f={f}>
+                <Heave tilt={tilt} />
+              </Scene>
+            ))}
+            {CRACKS.map(([f, seed, rot], i) => (
               <Scene key={`cr${i}`} pts={pts} f={f}>
-                <path
-                  d={CRACK_PATHS[v]}
-                  transform={flip ? "scale(-1 1)" : undefined}
-                  fill="none"
-                  stroke="var(--line-strong)"
-                  strokeWidth="1.9"
-                  strokeLinejoin="round"
-                  opacity={0.55 + (i % 3) * 0.12}
-                />
+                <Crack seed={seed} rot={rot} o={0.5 + (i % 3) * 0.13} />
               </Scene>
             ))}
             {CHIPS.map(([f, side], i) => (
@@ -278,6 +360,13 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
                 <g transform={`scale(${side} 1)`}>
                   <circle cx={RIBBON / 2 + 2} cy="0" r="6.5" fill="var(--field)" />
                   <path d={`M${RIBBON / 2 - 5} -6 L${RIBBON / 2 - 1} -1 L${RIBBON / 2 - 6} 5`} fill="none" stroke="var(--line-strong)" strokeWidth="1.5" opacity="0.6" />
+                </g>
+              </Scene>
+            ))}
+            {WEEDS.map(([f, side, s], i) => (
+              <Scene key={`wd${i}`} pts={pts} f={f} d={side * 23}>
+                <g transform={`rotate(${side * 90})`}>
+                  <Weed s={s} />
                 </g>
               </Scene>
             ))}
@@ -303,9 +392,16 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
                  desire line is worn through where people walk anyway ---- */}
             <Scene pts={pts} f={SCENES.missing}>
               <rect x={-RIBBON / 2 - 5} y={-95} width={RIBBON + 10} height={190} fill="var(--field)" />
+              {/* rough ground where the panels should be */}
+              <path
+                d="M-24 -95 C -30 -60, -22 -30, -27 6 C -30 40, -21 70, -26 95 L26 95 C 21 64, 29 30, 24 -4 C 20 -38, 28 -66, 23 -95 Z"
+                fill="var(--olive-100)"
+                opacity="0.28"
+              />
+              {/* squared-off poured ends of the real sidewalk */}
               <path d={`M${-RIBBON / 2} -95 L${RIBBON / 2} -95 M${-RIBBON / 2} 95 L${RIBBON / 2} 95`} stroke="var(--line-strong)" strokeWidth="2.6" opacity="0.75" />
-              <path d={`M${-RIBBON / 2} -88 L${-RIBBON / 2} 88 M${RIBBON / 2} -88 L${RIBBON / 2} 88`} stroke="var(--line)" strokeWidth="1.5" strokeDasharray="4 9" opacity="0.65" />
-              <path d="M3 -95 C 13 -60, -13 -26, 4 8 C 15 36, -7 66, 2 95" fill="none" stroke="var(--olive-700)" strokeWidth="12" strokeLinecap="round" opacity="0.2" />
+              {/* the desire line, worn to bare dirt */}
+              <path d="M3 -95 C 13 -60, -13 -26, 4 8 C 15 36, -7 66, 2 95" fill="none" stroke="var(--olive-700)" strokeWidth="12" strokeLinecap="round" opacity="0.24" />
               <path d="M3 -95 C 13 -60, -13 -26, 4 8 C 15 36, -7 66, 2 95" fill="none" stroke="var(--olive-800)" strokeWidth="2" strokeDasharray="6 10" opacity="0.35" />
               {(
                 [
@@ -318,6 +414,13 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
               ).map(([xx, yy], i) => (
                 <circle key={i} cx={xx} cy={yy} r="2.2" fill="var(--olive-700)" opacity="0.45" />
               ))}
+              {/* rocks and weeds claiming the gap */}
+              <path d="M-19 -48 L-14 -51 L-10 -48 L-12 -44 L-18 -44 Z" fill="var(--field-3)" stroke="var(--line-strong)" strokeWidth="0.9" opacity="0.7" />
+              <path d="M14 52 L19 50 L22 54 L18 57 L14 56 Z" fill="var(--field-3)" stroke="var(--line-strong)" strokeWidth="0.9" opacity="0.6" />
+              <g transform="translate(-16 -14)"><Weed s={1.15} /></g>
+              <g transform="translate(15 -58) rotate(15)"><Weed s={0.9} /></g>
+              <g transform="translate(-13 44) rotate(-12)"><Weed s={1.05} /></g>
+              <g transform="translate(17 80) rotate(8)"><Weed s={0.8} /></g>
               <g transform="translate(0 104)">
                 <Barricade id="nb-near" />
               </g>
@@ -333,8 +436,15 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
 
             {/* ---- failing: fractures and a hedge over the edge ---- */}
             <Scene pts={pts} f={SCENES.broken}>
-              <path d="M-26 -38 L-8 -30 L2 -14 L-4 4 L10 18 L4 34 M-8 -30 L-18 -12 M2 -14 L18 -8" fill="none" stroke="var(--line-strong)" strokeWidth="2.2" strokeLinejoin="round" opacity="0.9" />
-              <path d="M-26 52 L-2 60 L8 74" fill="none" stroke="var(--line-strong)" strokeWidth="1.8" opacity="0.7" />
+              <g transform="translate(0 -6)">
+                <Crack seed={201} rot={90} o={0.85} span={64} />
+              </g>
+              <g transform="translate(0 44)">
+                <Crack seed={202} o={0.7} />
+              </g>
+              <g transform="translate(5 12)">
+                <Weed s={1.2} />
+              </g>
               <ellipse cx={-RIBBON / 2 - 8} cy="-70" rx="34" ry="26" fill="var(--olive-400)" opacity="0.5" />
               <ellipse cx={-RIBBON / 2 + 6} cy="-58" rx="22" ry="16" fill="var(--olive-300)" opacity="0.55" />
             </Scene>
@@ -348,7 +458,12 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
             <Scene pts={pts} f={SCENES.math}>
               <rect x="-20" y="-60" width="38" height="46" rx="3" fill="var(--olive-800)" opacity="0.14" />
               <rect x="-14" y="8" width="30" height="34" rx="3" fill="var(--olive-800)" opacity="0.1" />
-              <path d="M-24 62 L-4 70 L2 86 M10 -86 L22 -72" fill="none" stroke="var(--line-strong)" strokeWidth="2" opacity="0.8" />
+              <g transform="translate(-6 72)">
+                <Crack seed={211} o={0.6} span={40} />
+              </g>
+              <g transform="translate(15 -80) rotate(52)">
+                <Crack seed={212} o={0.55} span={30} />
+              </g>
             </Scene>
             <Scene pts={pts} f={SCENES.math} rotate={false}>
               <text x="48" y="2" fontSize="15" fill="var(--ink-mute)" fontFamily="var(--font-mono)">

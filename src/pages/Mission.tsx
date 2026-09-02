@@ -101,7 +101,7 @@ export default function Mission() {
           <p className="font-sans text-[11px] font-semibold tracking-[0.14em] text-ink-on-dark-soft uppercase">
             SideQuest ATX · Northwest Austin
           </p>
-          <h1 className="mt-4 max-w-3xl font-serif text-[clamp(2.2rem,4.8vw,3.5rem)] leading-[1.08] font-semibold tracking-[-0.02em] text-balance">
+          <h1 className="mt-4 max-w-3xl font-serif text-[clamp(2.2rem,4.8vw,3.5rem)] leading-[1.08] font-bold tracking-[-0.02em] text-balance">
             Austin knows its sidewalks by the mile. Nobody knows them by the panel.
           </h1>
           <Rise delay={0.6}>
@@ -138,7 +138,7 @@ export default function Mission() {
           <Chapter id="missing">
             <Claim>Austin doesn't have a sidewalk network. It has 2,800 miles of fragments.</Claim>
             <Rise delay={0.1}>
-              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-extrabold tracking-tight text-olive-800 tabular-nums">
                 <CountUp value={1500} suffix=" mi" duration={1.8} />
               </p>
               <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
@@ -160,7 +160,7 @@ export default function Mission() {
           <Chapter id="broken">
             <Claim>Most of what was built is failing the City's own test.</Claim>
             <Rise delay={0.1}>
-              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-extrabold tracking-tight text-olive-800 tabular-nums">
                 <CountUp value={32} suffix="%" duration={1.5} />
               </p>
               <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
@@ -198,7 +198,7 @@ export default function Mission() {
           <Chapter id="math">
             <Claim>The City priced the fix. Then it did the math on the money.</Claim>
             <Rise delay={0.1}>
-              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-extrabold tracking-tight text-olive-800 tabular-nums">
                 <CountUp value={90} suffix="+ years" duration={1.5} />
               </p>
               <p
@@ -245,7 +245,7 @@ export default function Mission() {
               </p>
             </Rise>
             <Rise delay={0.15}>
-              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-extrabold tracking-tight text-olive-800 tabular-nums">
                 1 in 4
               </p>
               <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
@@ -283,7 +283,7 @@ export default function Mission() {
           <Chapter id="precedent">
             <Claim>Cities that don't count their sidewalks eventually get counted by a court.</Claim>
             <Rise delay={0.1}>
-              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-extrabold tracking-tight text-olive-800 tabular-nums">
                 <CountUp value={1.4} prefix="$" suffix="B" decimals={1} duration={1.5} />
               </p>
               <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
@@ -359,7 +359,7 @@ function Chapter({ id, children }: { id: string; children: ReactNode }) {
 function Claim({ children }: { children: ReactNode }) {
   return (
     <Rise>
-      <h2 className="max-w-2xl font-serif text-[clamp(1.55rem,1vw+1rem,1.95rem)] leading-[1.14] font-semibold tracking-[-0.015em] text-balance">
+      <h2 className="max-w-2xl font-serif text-[clamp(1.55rem,1vw+1rem,1.95rem)] leading-[1.14] font-bold tracking-[-0.015em] text-balance">
         {children}
       </h2>
     </Rise>

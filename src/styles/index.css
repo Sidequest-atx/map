@@ -24,9 +24,9 @@
    back to Times New Roman. Same for --font-mono. Never alias a theme key
    to a CSS variable of the same name. */
 @theme inline {
-  --font-serif: "IBM Plex Sans", system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-sans: "IBM Plex Sans", system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-serif: "Overpass", "Segoe UI", system-ui, Roboto, sans-serif;
+  --font-sans: "Overpass", "Segoe UI", system-ui, Roboto, sans-serif;
+  --font-mono: "Overpass Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --color-field: var(--field);
   --color-field-2: var(--field-2);

@@ -45,14 +45,14 @@
   --info-bg: oklch(0.92 0.03 230);
 
   /* Type */
-  /* One IBM Plex superfamily, three roles: Sans carries display AND body
-     (the old serif slot now points at Sans so every display style follows),
-     Mono carries annotations. Chosen over a serif deliberately: screen
-     legibility research finds no serif advantage; system coherence is what
-     reads as designed. */
-  --font-serif: "IBM Plex Sans", system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-ui: "IBM Plex Sans", system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* Overpass, one superfamily in three roles (display+body via the old
+     serif slot and --font-ui, Overpass Mono for annotations). Chosen for
+     provenance, not neutrality: Overpass is derived from Highway Gothic,
+     the FHWA typeface on US road signage — the letterforms of American
+     street infrastructure, on a product about street infrastructure. */
+  --font-serif: "Overpass", "Segoe UI", system-ui, Roboto, sans-serif;
+  --font-ui: "Overpass", "Segoe UI", system-ui, Roboto, sans-serif;
+  --font-mono: "Overpass Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   /* Radii */
   --r-sm: 6px;

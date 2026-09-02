@@ -5,7 +5,7 @@ import { Car, Check, Dedup, Rank, Scan, Verify } from "../components/Icons";
 import { Motif } from "../components/Motif";
 import { useReports } from "../data/store";
 import { fmtInt } from "../lib/format";
-import { staticMapUrl } from "../lib/mapbox";
+import { staticMapUrl, useMapboxToken } from "../lib/mapbox";
 
 const AUSTIN_SIDEWALKS = "https://www.austintexas.gov/department/sidewalks";
 const CDC_FALLS = "https://www.cdc.gov/falls/data-research/";
@@ -20,7 +20,11 @@ export default function Mission() {
     const tickets = reports.filter((r) => r.ticket311);
     return { total: reports.length, open: open.length, verified: verified.length, veg: veg.length, tickets: tickets.length };
   }, [reports]);
-  const mapUrl = useMemo(() => staticMapUrl(reports.filter((r) => r.status !== "resolved")), [reports]);
+  const { token: mapboxToken } = useMapboxToken(); // re-render once the runtime token resolves
+  const mapUrl = useMemo(
+    () => (mapboxToken ? staticMapUrl(reports.filter((r) => r.status !== "resolved")) : null),
+    [reports, mapboxToken],
+  );
 
   return (
     <>

@@ -8,7 +8,7 @@ import { useSheetDrag } from "../components/useSheetDrag";
 import { useReports } from "../data/store";
 import { relativeDays, shortDate } from "../lib/format";
 import { bboxOf } from "../lib/geo";
-import { MAP_STYLE, MAPBOX_TOKEN, mapboxgl, NW_AUSTIN, SEVERITY_COLORS, tintMap } from "../lib/mapbox";
+import { MAP_STYLE, mapboxgl, NW_AUSTIN, SEVERITY_COLORS, tintMap, useMapboxToken } from "../lib/mapbox";
 import {
   HAZARD_SHORT,
   SEVERITY_LABELS,
@@ -89,14 +89,17 @@ export default function MapExplorer() {
     return () => window.removeEventListener("keydown", onKey);
   }, [selected, select]);
 
-  const canMap = Boolean(MAPBOX_TOKEN) && !mapFailed;
+  const { token, missing } = useMapboxToken();
+  const canMap = Boolean(token) && !mapFailed;
 
   return (
     <div className="explorer ui">
       {canMap ? (
         <MapCanvas reports={visible} selected={selected} onSelect={select} onFail={() => setMapFailed(true)} />
+      ) : !missing && !mapFailed ? (
+        <div className="explorer-map" aria-hidden /> /* token still resolving from sq_config */
       ) : (
-        <MapFallback reports={visible} onSelect={select} tokenMissing={!MAPBOX_TOKEN} />
+        <MapFallback reports={visible} onSelect={select} tokenMissing={missing} />
       )}
 
       <aside className={`explorer-panel ${panelOpen ? "is-open" : ""}`} aria-label="Map filters">
@@ -248,6 +251,19 @@ function MapCanvas({
     });
     m.on("load", () => {
       if (disposed) return;
+      // On an empty map nothing moves the camera, and mapbox-gl v3 occasionally
+      // leaves the first frame unpainted (the render loop doesn't kick until an
+      // interaction). resize + a zero-perceptible camera nudge forces the
+      // initial tile fetch and paint.
+      const kick = () => {
+        if (disposed) return;
+        m.resize();
+        m.triggerRepaint();
+        m.easeTo({ zoom: m.getZoom() + 0.001, duration: 1 });
+      };
+      kick();
+      requestAnimationFrame(kick);
+      m.once("idle", kick);
       tintMap(m);
       m.addSource(SRC, {
         type: "geojson",
@@ -489,7 +505,8 @@ function MapFallback({ reports, onSelect, tokenMissing }: { reports: HazardRepor
             <b>The map tiles are unavailable right now.</b>{" "}
             {tokenMissing ? (
               <>
-                Add <span className="mono">VITE_MAPBOX_TOKEN</span> to <span className="mono">.env.local</span> and restart.
+                Add a <span className="mono">mapbox_public_token</span> row to <span className="mono">sq_config</span> (or set{" "}
+                <span className="mono">VITE_MAPBOX_TOKEN</span> for local dev).
               </>
             ) : (
               <>Could be the network or the token. The reports are still here as a list.</>

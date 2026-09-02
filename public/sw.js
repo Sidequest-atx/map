@@ -1,7 +1,7 @@
 /* SideQuest ATX offline shell. Caches the app shell + fonts so the report
    flow opens without signal; reports themselves live in localStorage until
    the Supabase sync lands. */
-const VERSION = "sq-shell-v1";
+const VERSION = "sq-shell-v2";
 const SHELL = ["/", "/app", "/manifest.webmanifest", "/favicon.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {

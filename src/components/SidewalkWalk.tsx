@@ -53,6 +53,25 @@ function samplePath(d: string): Pt[] {
 const at = (pts: Pt[], f: number) => pts[Math.round(Math.min(Math.max(f, 0), 1) * SAMPLES)];
 const deg = (rad: number) => (rad * 180) / Math.PI;
 
+/** Polyline along the sampled path between two fractions, with an optional
+    per-sample normal offset — so overlays follow the curve, never cut it. */
+function subPath(pts: Pt[], f1: number, f2: number, wiggle?: (i: number) => number) {
+  const i1 = Math.max(0, Math.round(f1 * SAMPLES));
+  const i2 = Math.min(SAMPLES, Math.round(f2 * SAMPLES));
+  let d = "";
+  for (let i = i1; i <= i2; i++) {
+    const p = pts[i];
+    const w = wiggle ? wiggle(i - i1) : 0;
+    const x = p.x - Math.sin(p.a) * w;
+    const y = p.y + Math.cos(p.a) * w;
+    d += (i === i1 ? "M" : " L") + x.toFixed(1) + " " + y.toFixed(1);
+  }
+  return d;
+}
+
+/** The never-built stretch, in path fractions. */
+const GAP: [number, number] = [0.163, 0.197];
+
 /** Group positioned on the path at fraction f, rotated to the walk direction. */
 function Scene({ pts, f, children, rotate = true, d = 0 }: { pts: Pt[]; f: number; children: React.ReactNode; rotate?: boolean; d?: number }) {
   const p = at(pts, f);
@@ -108,6 +127,42 @@ function Tree({ r }: { r: number }) {
   );
 }
 
+/** Stylized Austin landmarks, plan view, labeled like the rest of the drawing. */
+function Capitol() {
+  return (
+    <g>
+      <rect x="-64" y="-22" width="128" height="44" rx="2" fill="var(--olive-800)" opacity="0.09" />
+      <rect x="-64" y="-22" width="128" height="44" rx="2" fill="none" stroke="var(--line-strong)" strokeWidth="1.8" opacity="0.55" />
+      <rect x="-16" y="-48" width="32" height="96" rx="2" fill="var(--olive-800)" opacity="0.07" />
+      <rect x="-16" y="-48" width="32" height="96" rx="2" fill="none" stroke="var(--line-strong)" strokeWidth="1.6" opacity="0.5" />
+      <circle r="20" fill="var(--field)" stroke="var(--line-strong)" strokeWidth="1.8" opacity="0.9" />
+      <circle r="12" fill="none" stroke="var(--line-strong)" strokeWidth="1.1" opacity="0.6" />
+      <circle r="4.5" fill="var(--olive-800)" opacity="0.35" />
+    </g>
+  );
+}
+
+function UtTower() {
+  return (
+    <g>
+      <rect x="-30" y="-30" width="60" height="60" rx="2" fill="var(--olive-800)" opacity="0.08" />
+      <rect x="-30" y="-30" width="60" height="60" rx="2" fill="none" stroke="var(--line-strong)" strokeWidth="1.6" opacity="0.5" />
+      <rect x="-13" y="-13" width="26" height="26" fill="var(--olive-800)" opacity="0.16" />
+      <rect x="-13" y="-13" width="26" height="26" fill="none" stroke="var(--line-strong)" strokeWidth="1.6" opacity="0.7" />
+      <rect x="-6" y="-6" width="12" height="12" fill="none" stroke="var(--line-strong)" strokeWidth="1" opacity="0.55" />
+    </g>
+  );
+}
+
+function BartonSprings() {
+  return (
+    <g>
+      <rect x="-58" y="-17" width="116" height="34" rx="17" fill="var(--info-bg)" stroke="var(--info)" strokeWidth="1.6" opacity="0.85" />
+      <path d="M-40 -2 C -30 -6, -20 2, -10 -2 M0 4 C 10 0, 20 8, 30 4" fill="none" stroke="var(--info)" strokeWidth="1.3" opacity="0.5" strokeLinecap="round" />
+    </g>
+  );
+}
+
 /** Plan-view hazard barricade: striped board on two feet, set across the walk. */
 function Barricade({ id }: { id: string }) {
   return (
@@ -142,47 +197,71 @@ function rng(seed: number) {
   };
 }
 
-function crackShape(seed: number, span = 50) {
+/** Chain of quadratic curves through midpoints: no polyline corners left. */
+function smoothPath(pts: [number, number][]) {
+  if (pts.length < 3) return "M" + pts.map((p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" L");
+  let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mx = (pts[i][0] + pts[i + 1][0]) / 2;
+    const my = (pts[i][1] + pts[i + 1][1]) / 2;
+    d += ` Q${pts[i][0].toFixed(1)} ${pts[i][1].toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)}`;
+  }
+  const last = pts[pts.length - 1];
+  return d + ` L${last[0].toFixed(1)} ${last[1].toFixed(1)}`;
+}
+
+function crackShape(seed: number, span?: number) {
   const r = rng(seed);
-  let x = -span / 2;
-  let y = (r() - 0.5) * 22;
+  const sp = span ?? 38 + r() * 20;
+  // Personality, all drawn from the seed so no two cracks share a character:
+  const wob = 0.2 + r() * 0.45; // how much it wanders
+  const turnP = 0.07 + r() * 0.16; // how often it takes a real turn
+  const stride = 1.8 + r() * 2.2; // segment length
+  const branchMax = Math.floor(r() * 4); // 0–3 hairline branches
+  const cY = (v: number) => Math.max(-23, Math.min(23, v));
+  let x = -sp / 2;
+  let y = cY((r() - 0.5) * 30);
   let a = (r() - 0.5) * 0.5;
-  const clamp = (v: number) => Math.max(-23, Math.min(23, v));
-  let main = `M${x.toFixed(1)} ${y.toFixed(1)}`;
-  const branches: string[] = [];
-  const steps = 13 + Math.floor(r() * 6);
+  const main: [number, number][] = [[x, y]];
+  const branches: { d: string; w: number }[] = [];
+  const steps = 16 + Math.floor(r() * 12);
   for (let i = 0; i < steps; i++) {
-    a = Math.max(-0.9, Math.min(0.9, a + (r() - 0.5) * 0.6));
-    const len = 2.4 + r() * 3.4;
+    if (r() < turnP) a += (r() < 0.5 ? -1 : 1) * (0.6 + r() * 0.7);
+    else a += (r() - 0.5) * wob * 2;
+    a = Math.max(-1.15, Math.min(1.15, a));
+    const len = stride * (0.6 + r() * 0.8);
     x += Math.cos(a) * len;
-    y = clamp(y + Math.sin(a) * len);
-    main += ` L${x.toFixed(1)} ${y.toFixed(1)}`;
-    if (r() < 0.16 && branches.length < 3) {
+    y = cY(y + Math.sin(a) * len);
+    main.push([x, y]);
+    if (r() < 0.13 && branches.length < branchMax) {
+      const bpts: [number, number][] = [[x, y]];
       let bx = x;
       let by = y;
-      let ba = a + (r() < 0.5 ? 1 : -1) * (0.5 + r() * 0.5);
-      let b = `M${bx.toFixed(1)} ${by.toFixed(1)}`;
-      const bs = 3 + Math.floor(r() * 4);
+      let ba = a + (r() < 0.5 ? 1 : -1) * (0.5 + r() * 0.7);
+      const bs = 3 + Math.floor(r() * 5);
       for (let j = 0; j < bs; j++) {
-        ba += (r() - 0.5) * 0.5;
-        const bl = 1.6 + r() * 2.2;
+        ba += (r() - 0.5) * 0.6;
+        const bl = 1.4 + r() * 2;
         bx += Math.cos(ba) * bl;
-        by = clamp(by + Math.sin(ba) * bl);
-        b += ` L${bx.toFixed(1)} ${by.toFixed(1)}`;
+        by = cY(by + Math.sin(ba) * bl);
+        bpts.push([bx, by]);
       }
-      branches.push(b);
+      branches.push({ d: smoothPath(bpts), w: 0.7 + r() * 0.4 });
     }
   }
-  return { main, branches };
+  return { main: smoothPath(main), branches, w: 1.05 + r() * 0.7 };
 }
 
 function Crack({ seed, rot = 0, o = 0.62, span }: { seed: number; rot?: number; o?: number; span?: number }) {
   const c = crackShape(seed, span);
   return (
     <g transform={rot ? `rotate(${rot})` : undefined} opacity={o}>
-      <path d={c.main} fill="none" stroke="var(--line-strong)" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
+      {c.w > 1.45 && (
+        <path d={c.main} fill="none" stroke="var(--line-strong)" strokeWidth={c.w * 2.4} strokeLinejoin="round" strokeLinecap="round" opacity="0.14" />
+      )}
+      <path d={c.main} fill="none" stroke="var(--line-strong)" strokeWidth={c.w} strokeLinejoin="round" strokeLinecap="round" />
       {c.branches.map((b, i) => (
-        <path key={i} d={b} fill="none" stroke="var(--line-strong)" strokeWidth="0.85" strokeLinejoin="round" strokeLinecap="round" />
+        <path key={i} d={b.d} fill="none" stroke="var(--line-strong)" strokeWidth={b.w} strokeLinejoin="round" strokeLinecap="round" />
       ))}
     </g>
   );
@@ -389,45 +468,54 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
               </g>
             </Scene>
 
-            {/* ---- never built: the ribbon stops square, barricaded, and a dirt
-                 desire line is worn through where people walk anyway ---- */}
-            <Scene pts={pts} f={SCENES.missing}>
-              <rect x={-RIBBON / 2 - 5} y={-95} width={RIBBON + 10} height={190} fill="var(--field)" />
-              {/* rough ground where the panels should be */}
-              <path
-                d="M-24 -95 C -30 -60, -22 -30, -27 6 C -30 40, -21 70, -26 95 L26 95 C 21 64, 29 30, 24 -4 C 20 -38, 28 -66, 23 -95 Z"
-                fill="var(--olive-100)"
-                opacity="0.28"
-              />
-              {/* squared-off poured ends of the real sidewalk */}
-              <path d={`M${-RIBBON / 2} -95 L${RIBBON / 2} -95 M${-RIBBON / 2} 95 L${RIBBON / 2} 95`} stroke="var(--line-strong)" strokeWidth="2.6" opacity="0.75" />
-              {/* the desire line, worn to bare dirt */}
-              <path d="M3 -95 C 13 -60, -13 -26, 4 8 C 15 36, -7 66, 2 95" fill="none" stroke="var(--olive-700)" strokeWidth="12" strokeLinecap="round" opacity="0.24" />
-              <path d="M3 -95 C 13 -60, -13 -26, 4 8 C 15 36, -7 66, 2 95" fill="none" stroke="var(--olive-800)" strokeWidth="2" strokeDasharray="6 10" opacity="0.35" />
-              {(
-                [
-                  [-13, -70],
-                  [12, -34],
-                  [-11, 2],
-                  [13, 30],
-                  [-9, 62],
-                ] as const
-              ).map(([xx, yy], i) => (
-                <circle key={i} cx={xx} cy={yy} r="2.2" fill="var(--olive-700)" opacity="0.45" />
-              ))}
-              {/* rocks and weeds claiming the gap */}
-              <path d="M-19 -48 L-14 -51 L-10 -48 L-12 -44 L-18 -44 Z" fill="var(--field-3)" stroke="var(--line-strong)" strokeWidth="0.9" opacity="0.7" />
-              <path d="M14 52 L19 50 L22 54 L18 57 L14 56 Z" fill="var(--field-3)" stroke="var(--line-strong)" strokeWidth="0.9" opacity="0.6" />
-              <g transform="translate(-16 -14)"><Weed s={1.15} /></g>
-              <g transform="translate(15 -58) rotate(15)"><Weed s={0.9} /></g>
-              <g transform="translate(-13 44) rotate(-12)"><Weed s={1.05} /></g>
-              <g transform="translate(17 80) rotate(8)"><Weed s={0.8} /></g>
-              <g transform="translate(0 104)">
-                <Barricade id="nb-near" />
-              </g>
-              <g transform="translate(0 -104)">
-                <Barricade id="nb-far" />
-              </g>
+            {/* ---- never built: the ribbon stops for a curved stretch. The
+                 erase and the dirt both follow the sampled path, so the gap
+                 bends with the sidewalk instead of cutting straight across ---- */}
+            <path d={subPath(pts, GAP[0], GAP[1])} fill="none" stroke="var(--field)" strokeWidth={RIBBON + 11} strokeLinecap="butt" />
+            <path d={subPath(pts, GAP[0], GAP[1])} fill="none" stroke="var(--olive-100)" strokeWidth={RIBBON - 2} strokeLinecap="butt" opacity="0.28" />
+            {GAP.map((f) => {
+              const s = strip(f, -RIBBON / 2, RIBBON / 2);
+              return <line key={f} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="var(--line-strong)" strokeWidth="2.6" opacity="0.75" />;
+            })}
+            <path
+              d={subPath(pts, GAP[0] - 0.002, GAP[1] + 0.002, (i) => 8 * Math.sin(i * 0.85) + 3 * Math.sin(i * 2.1))}
+              fill="none"
+              stroke="var(--olive-700)"
+              strokeWidth="12"
+              strokeLinecap="round"
+              opacity="0.24"
+            />
+            <path
+              d={subPath(pts, GAP[0] - 0.002, GAP[1] + 0.002, (i) => 8 * Math.sin(i * 0.85) + 3 * Math.sin(i * 2.1))}
+              fill="none"
+              stroke="var(--olive-800)"
+              strokeWidth="2"
+              strokeDasharray="6 10"
+              opacity="0.35"
+            />
+            {([[0.168, 6], [0.174, -9], [0.181, 8], [0.188, -6], [0.194, 5]] as const).map(([f, dd], i) => (
+              <Scene key={`pb${i}`} pts={pts} f={f} d={dd} rotate={false}>
+                <circle r="2.2" fill="var(--olive-700)" opacity="0.45" />
+              </Scene>
+            ))}
+            <Scene pts={pts} f={0.17} d={-10} rotate={false}>
+              <path d="M-5 -4 L0 -7 L4 -4 L2 0 L-4 0 Z" fill="var(--field-3)" stroke="var(--line-strong)" strokeWidth="0.9" opacity="0.7" />
+            </Scene>
+            <Scene pts={pts} f={0.191} d={11} rotate={false}>
+              <path d="M0 -4 L5 -6 L8 -2 L4 1 L0 0 Z" fill="var(--field-3)" stroke="var(--line-strong)" strokeWidth="0.9" opacity="0.6" />
+            </Scene>
+            {([[0.167, -14, 1.15, 0], [0.176, 12, 0.9, 15], [0.186, -12, 1.05, -12], [0.195, 13, 0.8, 8]] as const).map(([f, dd, s, rr], i) => (
+              <Scene key={`gw${i}`} pts={pts} f={f} d={dd} rotate={false}>
+                <g transform={`rotate(${rr})`}>
+                  <Weed s={s} />
+                </g>
+              </Scene>
+            ))}
+            <Scene pts={pts} f={GAP[0] - 0.003}>
+              <Barricade id="nb-near" />
+            </Scene>
+            <Scene pts={pts} f={GAP[1] + 0.003}>
+              <Barricade id="nb-far" />
             </Scene>
             <Scene pts={pts} f={SCENES.missing} rotate={false}>
               <text x="48" y="5" fontSize="15" fill="var(--ink-mute)" fontFamily="var(--font-mono)">
@@ -571,7 +659,9 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
             {(
               [
                 [0.18, 208, 3],
+                [0.3, 214, -2],
                 [0.5, 214, -2],
+                [0.66, 210, 3],
                 [0.82, 208, 2],
               ] as const
             ).map(([f, d, tilt], i) => (
@@ -579,6 +669,26 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
                 <House w={88} h={68} tilt={tilt} />
               </Scene>
             ))}
+
+            {/* Austin, off in the drawing's distance */}
+            <Scene pts={pts} f={0.56} d={236} rotate={false}>
+              <BartonSprings />
+              <text y="36" textAnchor="middle" fontSize="12" fill="var(--ink-mute)" fontFamily="var(--font-mono)">
+                barton springs
+              </text>
+            </Scene>
+            <Scene pts={pts} f={0.93} d={212} rotate={false}>
+              <UtTower />
+              <text y="48" textAnchor="middle" fontSize="12" fill="var(--ink-mute)" fontFamily="var(--font-mono)">
+                ut tower
+              </text>
+            </Scene>
+            <Scene pts={pts} f={0.975} d={-210} rotate={false}>
+              <Capitol />
+              <text y="66" textAnchor="middle" fontSize="12" fill="var(--ink-mute)" fontFamily="var(--font-mono)">
+                the capitol
+              </text>
+            </Scene>
 
             {/* trees, both sides */}
             {(
@@ -605,6 +715,7 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
               r="13"
               fill="var(--olive-600)"
               opacity="0.25"
+              initial={reduced ? undefined : { r: 13, opacity: 0.3 }}
               animate={reduced ? undefined : { r: [13, 26], opacity: [0.3, 0] }}
               transition={{ repeat: Infinity, duration: 2.1, ease: "easeOut" }}
             />

@@ -12,9 +12,17 @@ type PaintProp = Parameters<mapboxgl.Map["setPaintProperty"]>[1];
  * iPhone app uses — so a hosted deploy needs no build-time secret and a token
  * rotation reaches every surface without a redeploy.
  */
-export const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+/* Strip BOM + whitespace: an env var pasted through PowerShell 5.1 can carry
+   a leading U+FEFF, which URL-encodes into the token (%EF%BB%BF...) and makes
+   Mapbox reject every request. Sanitize here so no entry path can leak it. */
+const cleanToken = (t: string | null | undefined): string | null => {
+  const v = (t ?? "").replace(/^﻿/, "").trim();
+  return v || null;
+};
 
-let token: string | null = MAPBOX_TOKEN || null;
+export const MAPBOX_TOKEN = cleanToken(import.meta.env.VITE_MAPBOX_TOKEN);
+
+let token: string | null = MAPBOX_TOKEN;
 /** True only once sq_config answered and genuinely has no token row. */
 let tokenMissing = false;
 let fetchStarted = false;
@@ -36,10 +44,10 @@ function fetchTokenOnce() {
         // message names the sq_config row) but allow a retry on a later visit.
         fetchStarted = false;
         tokenMissing = true;
-      } else if (data?.value) {
-        token = data.value;
+      } else if (cleanToken(data?.value)) {
+        token = cleanToken(data?.value);
         tokenMissing = false;
-        mapboxgl.accessToken = token;
+        mapboxgl.accessToken = token!;
       } else {
         tokenMissing = true;
       }

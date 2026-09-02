@@ -1,5 +1,6 @@
+// mapbox-gl's stylesheet is imported in styles/index.css (layer "vendor"),
+// so the site's overrides keep beating it under cascade layers.
 import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
 import { useSyncExternalStore } from "react";
 import type { Severity } from "../types";
 import { supabase } from "./supabase";

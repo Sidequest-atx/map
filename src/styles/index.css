@@ -1,0 +1,94 @@
+/*
+ * Single CSS entry. Cascade layers keep the two systems honest:
+ *   vendor  – mapbox-gl's stylesheet
+ *   site    – the hand-rolled system (tokens.css + global.css), which styles
+ *             every existing page and may override vendor
+ *   theme/base/utilities – Tailwind v4 (no preflight: the site has its own
+ *             reset, and preflight would bulldoze the existing pages)
+ * Utilities sit last, so Tailwind classes win where the new landing uses
+ * them; pages that never use a utility are untouched.
+ */
+@layer vendor, site, theme, base, utilities;
+
+@import "mapbox-gl/dist/mapbox-gl.css" layer(vendor);
+@import "./global.css" layer(site);
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* The olive/beige system, exposed to Tailwind. `inline` keeps utilities
+   referencing the live CSS variables from tokens.css. */
+@theme inline {
+  --font-serif: var(--font-serif);
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-mono);
+
+  --color-field: var(--field);
+  --color-field-2: var(--field-2);
+  --color-field-3: var(--field-3);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-mute: var(--ink-mute);
+  --color-ink-on-dark: var(--ink-on-dark);
+  --color-ink-on-dark-soft: var(--ink-on-dark-soft);
+
+  --color-olive-50: var(--olive-50);
+  --color-olive-100: var(--olive-100);
+  --color-olive-200: var(--olive-200);
+  --color-olive-300: var(--olive-300);
+  --color-olive-400: var(--olive-400);
+  --color-olive-500: var(--olive-500);
+  --color-olive-600: var(--olive-600);
+  --color-olive-700: var(--olive-700);
+  --color-olive-800: var(--olive-800);
+  --color-olive-900: var(--olive-900);
+
+  --color-sev-low: var(--sev-low);
+  --color-sev-moderate: var(--sev-moderate);
+  --color-sev-severe: var(--sev-severe);
+  --color-sev-low-bg: var(--sev-low-bg);
+  --color-sev-moderate-bg: var(--sev-moderate-bg);
+  --color-sev-severe-bg: var(--sev-severe-bg);
+  --color-ok: var(--ok);
+  --color-danger: var(--danger);
+
+  /* shadcn-token names, so registry components arrive wearing SideQuest */
+  --color-background: var(--field);
+  --color-foreground: var(--ink);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-primary: var(--olive-600);
+  --color-primary-foreground: var(--ink-on-dark);
+  --color-secondary: var(--field-2);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--field-2);
+  --color-muted-foreground: var(--ink-mute);
+  --color-accent: var(--olive-100);
+  --color-accent-foreground: var(--olive-900);
+  --color-destructive: var(--danger);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--olive-500);
+
+  --animate-marquee: marquee var(--duration, 40s) linear infinite;
+  --animate-marquee-vertical: marquee-vertical var(--duration, 40s) linear infinite;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100% - var(--gap, 1rem)));
+  }
+}
+@keyframes marquee-vertical {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(-100% - var(--gap, 1rem)));
+  }
+}

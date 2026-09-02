@@ -5,7 +5,7 @@ import { NotFound, PageLoading } from "./components/Bits";
 import { RequireRole } from "./components/RequireRole";
 import { AppLayout } from "./layouts/AppLayout";
 import { SiteLayout } from "./layouts/SiteLayout";
-import "./styles/global.css";
+import "./styles/index.css";
 
 const Mission = lazy(() => import("./pages/Mission"));
 const MapExplorer = lazy(() => import("./pages/MapExplorer"));

@@ -23,28 +23,19 @@ export default function How() {
             <li>
               <div>
                 <h3>Photograph it from the sidewalk or the passenger seat.</h3>
-                <p>
-                  The app opens the rear camera. One clear frame is enough. Photos are of public right-of-way only; we never publish faces, plates, or
-                  house numbers.
-                </p>
+                <p>One clear frame from the app is enough. Public right-of-way only; no faces, plates, or house numbers, ever.</p>
               </div>
             </li>
             <li>
               <div>
                 <h3>The model suggests what it is. You confirm.</h3>
-                <p>
-                  Crack, root heave, vegetation, missing ramp, missing segment, debris. Severity too. The suggestion is shown with its confidence and
-                  a reason; you correct it in one tap if it is wrong. The model name is recorded so the data can be re-scored later.
-                </p>
+                <p>Type and severity, shown with confidence and a reason. Wrong? One tap fixes it, and the model name stays on the record.</p>
               </div>
             </li>
             <li>
               <div>
                 <h3>We check whether it is already on the map.</h3>
-                <p>
-                  Same hazard type within fifteen metres of an open report? You are asked whether to add your photo to that record instead of creating a
-                  duplicate.
-                </p>
+                <p>Same hazard within fifteen metres of an open report? You are asked before a duplicate is born.</p>
               </div>
             </li>
             <li>
@@ -56,19 +47,13 @@ export default function How() {
             <li>
               <div>
                 <h3>A moderator routes it.</h3>
-                <p>
-                  Structural defects are submitted to Austin 311 and the service request number is attached. Vegetation gets a printed door-hanger
-                  for the adjacent landowner, and a volunteer visit if nothing changes in two weeks.
-                </p>
+                <p>Structural defects go to Austin 311 with the ticket number attached. Vegetation gets a door-hanger for the landowner.</p>
               </div>
             </li>
             <li>
               <div>
                 <h3>It is resolved only with an after-photo.</h3>
-                <p>
-                  The store refuses to mark a report resolved without a second photo. The model checks that the hazard is gone; a named moderator signs
-                  off. Before and after are shown side by side on the map.
-                </p>
+                <p>No second photo, no "resolved". The model checks the hazard is gone; a named moderator signs; before and after go on the map.</p>
               </div>
             </li>
           </ol>
@@ -159,7 +144,7 @@ export default function How() {
             <li>Let the model decide. Every classification, duplicate, and close-out is confirmed by a person.</li>
             <li>Publish faces, license plates, or house numbers. Photos are cropped to the right-of-way.</li>
             <li>Close a report on the city's word alone. An after-photo or it stays open.</li>
-            <li>Wind down in 2031. The map is designed to be handed to the next cohort and to the city.</li>
+            <li>Walk away quietly. The map is designed to be handed to the next cohort and to the city.</li>
           </ul>
         </div>
       </section>

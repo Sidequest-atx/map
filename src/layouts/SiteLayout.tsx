@@ -100,7 +100,7 @@ export function SiteLayout() {
                 <h4>Organization</h4>
                 <ul>
                   <li>Founded 2026, Northwest Austin</li>
-                  <li>Student-led, open data, runs through 2031 and beyond</li>
+                  <li>Student-led, open data, built to outlive its founders</li>
                   <li>
                     <a href="mailto:hello@sidequestatx.org">hello@sidequestatx.org</a>
                   </li>

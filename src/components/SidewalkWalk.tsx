@@ -298,9 +298,10 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
               <line key={`w${i}`} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="var(--surface)" strokeWidth="9" opacity="0.95" />
             ))}
 
-            {/* the street: asphalt, edge lines, a faded center dash */}
-            <path d={STREET_D} fill="none" stroke="var(--line-strong)" strokeWidth="104" strokeLinecap="round" opacity="0.3" />
-            <path d={STREET_D} fill="none" stroke="var(--field-3)" strokeWidth="98" strokeLinecap="round" opacity="0.95" />
+            {/* the street: asphalt, edge lines, a faded center dash.
+                Butt caps: the drawing ends on a square cut, not a pill. */}
+            <path d={STREET_D} fill="none" stroke="var(--line-strong)" strokeWidth="104" strokeLinecap="butt" opacity="0.3" />
+            <path d={STREET_D} fill="none" stroke="var(--field-3)" strokeWidth="98" strokeLinecap="butt" opacity="0.95" />
             <path d={STREET_D} fill="none" stroke="var(--sev-moderate)" strokeWidth="3" strokeDasharray="30 38" opacity="0.35" />
 
             {/* street furniture */}
@@ -329,8 +330,8 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
             <path d={PATH_D} fill="none" stroke="var(--line)" strokeWidth="2" strokeDasharray="3 14" opacity="0.7" />
 
             {/* the sidewalk ribbon */}
-            <path d={PATH_D} fill="none" stroke="var(--line-strong)" strokeWidth={RIBBON + 5} strokeLinecap="round" opacity="0.55" />
-            <path d={PATH_D} fill="none" stroke="var(--surface)" strokeWidth={RIBBON} strokeLinecap="round" />
+            <path d={PATH_D} fill="none" stroke="var(--line-strong)" strokeWidth={RIBBON + 5} strokeLinecap="butt" opacity="0.55" />
+            <path d={PATH_D} fill="none" stroke="var(--surface)" strokeWidth={RIBBON} strokeLinecap="butt" />
             {joints.map((j, i) => (
               <line key={i} x1={j.x1} y1={j.y1} x2={j.x2} y2={j.y2} stroke="var(--line)" strokeWidth="1.5" />
             ))}
@@ -485,7 +486,7 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
                 <circle cx="22" cy="0" r="11" fill="none" stroke="var(--olive-800)" strokeWidth="2.6" />
                 <path d="M-20 0 L-6 -16 L12 -16 M-6 -16 L-9 0 M12 -16 L22 0 M-9 0 L12 -16 M12 -16 L17 -24" fill="none" stroke="var(--olive-800)" strokeWidth="2.3" strokeLinejoin="round" />
               </g>
-              <g transform={`translate(${-RIBBON / 2 - 34} 78) rotate(12)`}>
+              <g transform={`translate(${-RIBBON / 2 - 34} 60) rotate(12)`}>
                 <circle cx="24" cy="-26" r="6" fill="var(--olive-800)" />
                 <path d="M0 0 C 6 -12 14 -20 21 -23" fill="none" stroke="var(--olive-800)" strokeWidth="8" strokeLinecap="round" />
                 <path d="M16 -20 L32 -12 M16 -20 L30 -30" fill="none" stroke="var(--olive-800)" strokeWidth="5.5" strokeLinecap="round" />
@@ -612,7 +613,7 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
         </g>
       </svg>
 
-      <p className="pointer-events-none absolute bottom-3 left-4 font-mono text-[10px] tracking-[0.16em] text-ink-mute uppercase">
+      <p className="pointer-events-none absolute bottom-3 left-4 hidden font-mono text-[10px] tracking-[0.16em] text-ink-mute uppercase lg:block">
         One sidewalk · plan view · you are the dot
       </p>
     </div>

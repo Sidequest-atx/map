@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { motion, useMotionValueEvent, useReducedMotion, useScroll, useTransform } from "motion/react";
 import { CountUp } from "../components/CountUp";
+import { Motif } from "../components/Motif";
 import { useReports } from "../data/store";
 import { fmtInt } from "../lib/format";
 import { staticMapUrl, useMapboxToken } from "../lib/mapbox";
@@ -53,8 +54,9 @@ export default function Mission() {
       {/* ---- Prologue: the question nobody can answer ---- */}
       <section
         id="prologue"
-        className="relative grid min-h-[calc(100dvh-var(--topbar-h))] content-center overflow-hidden bg-olive-900 text-ink-on-dark"
+        className="has-motif relative grid min-h-[calc(100dvh-var(--topbar-h))] content-center overflow-hidden bg-olive-900 text-ink-on-dark"
       >
+        <Motif kind="crack" opacity={0.14} style={{ color: "var(--olive-400)" }} />
         <div className="wrap pb-16">
           <p className="font-sans text-[11px] font-semibold tracking-[0.14em] text-ink-on-dark-soft uppercase">
             SideQuest ATX · Northwest Austin
@@ -83,7 +85,7 @@ export default function Mission() {
       </section>
 
       {/* ---- Ch. 1: what was never built ---- */}
-      <Chapter id="missing">
+      <Chapter id="missing" motif={<Motif kind="panels" opacity={0.09} style={{ color: "var(--olive-800)" }} />}>
         <Claim>The first problem isn't broken sidewalk. It's sidewalk that was never built.</Claim>
         <Rise delay={0.1}>
           <p className="mt-6 font-sans text-[clamp(3.6rem,9vw,6.5rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
@@ -106,7 +108,7 @@ export default function Mission() {
       </Chapter>
 
       {/* ---- Ch. 2: what exists is failing ---- */}
-      <Chapter id="broken" align="end">
+      <Chapter id="broken" align="end" motif={<Motif kind="roots" opacity={0.11} style={{ color: "var(--olive-800)" }} />}>
         <Claim>Most of what was built is failing the City's own test.</Claim>
         <Rise delay={0.1}>
           <p className="mt-6 font-sans text-[clamp(3.6rem,9vw,6.5rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
@@ -169,7 +171,7 @@ export default function Mission() {
       </Chapter>
 
       {/* ---- Ch. 4: the human cost ---- */}
-      <Chapter id="falls" align="end">
+      <Chapter id="falls" align="end" motif={<Motif kind="walker" opacity={0.13} style={{ color: "var(--olive-800)" }} />}>
         <Claim>The years are not free. They are paid in falls.</Claim>
         <Rise delay={0.1}>
           <p className="mt-6 font-sans text-[clamp(3.6rem,9vw,6.5rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
@@ -215,6 +217,10 @@ export default function Mission() {
             No agency can name the slab that breaks the next hip, so no crew gets sent to it. That is the missing
             dataset, and it doesn't take a bond to build. It takes photographs.
           </p>
+          <p className="mt-4 max-w-xl font-sans text-[0.95rem] leading-relaxed text-ink">
+            Fixing this takes <b>policy</b> and <b>action</b>. The City's plan above is the policy. The map below is
+            the action.
+          </p>
         </Rise>
         <Rise delay={0.2} className="mt-7 max-w-xl space-y-2.5 font-sans text-[14px]">
           {(
@@ -256,9 +262,20 @@ export default function Mission() {
 
 /* ================= building blocks ================= */
 
-function Chapter({ id, align = "start", children }: { id: string; align?: "start" | "end"; children: ReactNode }) {
+function Chapter({
+  id,
+  align = "start",
+  motif,
+  children,
+}: {
+  id: string;
+  align?: "start" | "end";
+  motif?: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <section id={id} className="grid min-h-[88vh] content-center py-16">
+    <section id={id} className="has-motif grid min-h-[88vh] content-center py-16">
+      {motif}
       <div className="wrap">
         <div className={`max-w-2xl lg:max-w-3xl ${align === "end" ? "lg:ml-auto" : ""}`}>{children}</div>
       </div>

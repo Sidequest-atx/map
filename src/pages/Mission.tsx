@@ -101,7 +101,7 @@ export default function Mission() {
           <p className="font-sans text-[11px] font-semibold tracking-[0.14em] text-ink-on-dark-soft uppercase">
             SideQuest ATX · Northwest Austin
           </p>
-          <h1 className="mt-4 max-w-3xl font-serif text-[clamp(2.3rem,5.2vw,3.8rem)] leading-[1.06] font-medium tracking-[-0.02em] text-balance">
+          <h1 className="mt-4 max-w-3xl font-serif text-[clamp(2.2rem,4.8vw,3.5rem)] leading-[1.08] font-semibold tracking-[-0.02em] text-balance">
             Austin knows its sidewalks by the mile. Nobody knows them by the panel.
           </h1>
           <Rise delay={0.6}>
@@ -359,7 +359,7 @@ function Chapter({ id, children }: { id: string; children: ReactNode }) {
 function Claim({ children }: { children: ReactNode }) {
   return (
     <Rise>
-      <h2 className="max-w-2xl font-serif text-[clamp(1.6rem,1vw+1.05rem,2.05rem)] leading-[1.08] font-medium tracking-[-0.02em] text-balance">
+      <h2 className="max-w-2xl font-serif text-[clamp(1.55rem,1vw+1rem,1.95rem)] leading-[1.14] font-semibold tracking-[-0.015em] text-balance">
         {children}
       </h2>
     </Rise>
@@ -492,7 +492,7 @@ function MapFinale({
               </span>
               Our count · live
             </p>
-            <p className="mt-2.5 font-serif text-[1.55rem] leading-tight font-medium">The count starts at zero.</p>
+            <p className="mt-2.5 font-serif text-[1.45rem] leading-tight font-semibold tracking-[-0.01em]">The count starts at zero.</p>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 font-sans text-[13px] text-ink-on-dark-soft">
               <span>
                 <b className="text-ink-on-dark tabular-nums">{fmtInt(live.total)}</b> on file

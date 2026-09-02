@@ -43,9 +43,14 @@
   --info-bg: oklch(0.92 0.03 230);
 
   /* Type */
-  --font-serif: "Literata", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* One IBM Plex superfamily, three roles: Sans carries display AND body
+     (the old serif slot now points at Sans so every display style follows),
+     Mono carries annotations. Chosen over a serif deliberately: screen
+     legibility research finds no serif advantage; system coherence is what
+     reads as designed. */
+  --font-serif: "IBM Plex Sans", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-ui: "IBM Plex Sans", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   /* Radii */
   --r-sm: 6px;

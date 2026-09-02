@@ -106,7 +106,7 @@ export default function MapExplorer() {
             <Filter style={{ width: 16, height: 16 }} /> Filters{anyFilter ? " •" : ""}
           </button>
           <span className="count">
-            {visible.length} shown of {reports.filter((r) => !r.duplicateOf).length} · <DemoBadge />
+            {visible.length} shown of {reports.filter((r) => !r.duplicateOf).length} <DemoBadge />
           </span>
         </div>
         <div className="explorer-filters">
@@ -153,14 +153,22 @@ export default function MapExplorer() {
               </button>
             ) : null}
           </div>
-          {visible.length === 0 && (
-            <div className="empty">
-              <h3>Nothing matches these filters.</h3>
-              <button className="btn btn--sm btn--primary" onClick={clearFilters}>
-                Clear filters
-              </button>
-            </div>
-          )}
+          {visible.length === 0 &&
+            (reports.length === 0 ? (
+              <div className="empty">
+                <h3>The map is waiting for its first photo.</h3>
+                <p className="small muted">
+                  Reports land here the moment they are captured in the app. <Link to="/app" viewTransition>Get the app</Link> to file the first one.
+                </p>
+              </div>
+            ) : (
+              <div className="empty">
+                <h3>Nothing matches these filters.</h3>
+                <button className="btn btn--sm btn--primary" onClick={clearFilters}>
+                  Clear filters
+                </button>
+              </div>
+            ))}
           <div className="legend">
             <span>
               <i className="sev-dot sev-dot--severe" /> Severe

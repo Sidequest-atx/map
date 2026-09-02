@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { hasRole, signOut, useSession } from "../data/session";
+import { hasRole, signOut, useAuthReady, useSession } from "../data/session";
 import { ROLE_LABELS, type Role } from "../types";
+import { PageLoading } from "./Bits";
 
 /**
  * Route gate. Signed-out users are sent to sign-in and returned afterwards.
@@ -10,7 +11,12 @@ import { ROLE_LABELS, type Role } from "../types";
  */
 export function RequireRole({ role, children }: { role: Role; children: ReactNode }) {
   const session = useSession();
+  const ready = useAuthReady();
   const location = useLocation();
+
+  // Don't bounce a signed-in moderator to sign-in while the persisted
+  // session is still being read.
+  if (!ready) return <PageLoading />;
 
   if (!session) {
     const next = encodeURIComponent(location.pathname + location.search);
@@ -22,7 +28,8 @@ export function RequireRole({ role, children }: { role: Role; children: ReactNod
         <div>
           <h1 className="h2">This area needs the {ROLE_LABELS[role].toLowerCase()} role.</h1>
           <p className="muted">
-            You are signed in as <b>{session.name}</b> ({ROLE_LABELS[session.role].toLowerCase()}). Switch roles to continue, or head back.
+            You are signed in as <b>{session.name}</b> ({ROLE_LABELS[session.role].toLowerCase()}). Moderator access is granted by SideQuest, not
+            chosen at sign-in. You can sign out, or head back to the map.
           </p>
           <div className="btn-row">
             <button
@@ -31,11 +38,8 @@ export function RequireRole({ role, children }: { role: Role; children: ReactNod
                 signOut();
               }}
             >
-              Switch role
+              Sign out
             </button>
-            <Link className="btn" to="/app">
-              Back to the app
-            </Link>
             <Link className="btn btn--ghost" to="/map">
               View the map
             </Link>

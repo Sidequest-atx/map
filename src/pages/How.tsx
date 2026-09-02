@@ -142,7 +142,7 @@ export default function How() {
           </div>
           <div className="btn-row">
             <Link to="/app" className="btn btn--primary" viewTransition>
-              Open the app
+              Get the app
             </Link>
             <Link to="/data" className="btn" viewTransition>
               See the numbers

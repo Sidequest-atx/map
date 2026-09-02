@@ -16,6 +16,7 @@ const TITLES: Record<string, string> = {
   "/map": "Live map · SideQuest ATX",
   "/how": "How it works · SideQuest ATX",
   "/data": "Open data · SideQuest ATX",
+  "/app": "Get the app · SideQuest ATX",
 };
 
 export function SiteLayout() {
@@ -46,7 +47,7 @@ export function SiteLayout() {
             ))}
           </nav>
           <Link to="/app" className={`btn btn--sm topbar-cta ${onDark ? "btn--dark" : "btn--primary"}`} viewTransition>
-            Open the app
+            Get the app
           </Link>
         </div>
       </header>
@@ -77,7 +78,7 @@ export function SiteLayout() {
                     <Link to="/data" viewTransition>Open data and downloads</Link>
                   </li>
                   <li>
-                    <Link to="/app" viewTransition>Report a hazard (app)</Link>
+                    <Link to="/app" viewTransition>Get the app</Link>
                   </li>
                 </ul>
               </div>

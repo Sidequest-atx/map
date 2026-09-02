@@ -1722,6 +1722,19 @@ ol {
   display: grid;
   gap: 0.5rem;
 }
+.linklike {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--olive-600);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.linklike:hover {
+  color: var(--olive-800);
+}
 
 /* ---------- Report flow ---------- */
 .flow {

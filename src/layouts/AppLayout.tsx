@@ -1,24 +1,16 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import { ErrorBoundary } from "../components/Bits";
-import { Camera, Car, Home, Mark } from "../components/Icons";
+import { Mark } from "../components/Icons";
 import { ToastRegion } from "../components/Toast";
-import { useSession } from "../data/session";
-
-const TABS = [
-  { to: "/app", label: "Home", Icon: Home, end: true },
-  { to: "/app/report", label: "Report", Icon: Camera },
-  { to: "/app/drive", label: "Drive", Icon: Car },
-];
+import { signOut, useSession } from "../data/session";
 
 const TITLES: Record<string, string> = {
-  "/app": "SideQuest app",
-  "/app/report": "Report a hazard · SideQuest",
-  "/app/drive": "Quest Drive · SideQuest",
   "/app/signin": "Sign in · SideQuest",
   "/portal": "Portal · SideQuest",
 };
 
+/** Chrome for the signed-in surfaces: sign-in and the moderator portal. */
 export function AppLayout() {
   const { pathname } = useLocation();
   const session = useSession();
@@ -26,7 +18,7 @@ export function AppLayout() {
   const isPortal = pathname.startsWith("/portal");
 
   useEffect(() => {
-    document.title = TITLES[pathname] ?? "SideQuest app";
+    document.title = TITLES[pathname] ?? "SideQuest ATX";
     window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   }, [pathname]);
 
@@ -44,23 +36,23 @@ export function AppLayout() {
   return (
     <div className="app ui">
       <header className="app-bar">
-        <Link to="/app" className="brand" viewTransition>
+        <Link to="/" className="brand" viewTransition>
           <Mark />
           <span>
             SideQuest <em>ATX</em>
           </span>
         </Link>
         <div className="app-bar-right">
-          {session && !isPortal && <span className="muted small">{session.name}</span>}
+          {session && <span className="muted small">{session.name}</span>}
           {session?.role === "moderator" && !isPortal && (
             <Link to="/portal" className="btn btn--sm" viewTransition>
               Portal
             </Link>
           )}
-          {isPortal && (
-            <Link to="/app" className="btn btn--sm" viewTransition>
-              App
-            </Link>
+          {session && (
+            <button className="btn btn--sm btn--ghost" onClick={signOut}>
+              Sign out
+            </button>
           )}
           <Link to="/map" className="btn btn--sm btn--ghost" viewTransition>
             Map
@@ -70,23 +62,12 @@ export function AppLayout() {
 
       {offline && (
         <div className="notice notice--warn" role="status" style={{ borderRadius: 0, justifyContent: "center" }}>
-          You are offline. Reports you submit are kept on this device and stay on your local map.
+          You are offline. Changes will not reach the map until the connection returns.
         </div>
       )}
 
-      {!isPortal && (
-        <nav className="tabbar" aria-label="App sections">
-          {TABS.map(({ to, label, Icon, end }) => (
-            <NavLink key={to} to={to} end={end} viewTransition className={({ isActive }) => (isActive ? "is-active" : "")}>
-              <Icon />
-              <span>{label}</span>
-            </NavLink>
-          ))}
-        </nav>
-      )}
-
       <main className={`app-main ${isPortal ? "app-main--wide" : ""}`}>
-        <ErrorBoundary home="/app">
+        <ErrorBoundary home="/">
           <Outlet />
         </ErrorBoundary>
       </main>

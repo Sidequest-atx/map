@@ -41,7 +41,7 @@ export default function Mission() {
                 See the live map
               </Link>
               <Link to="/app" className="btn btn--ghost-dark btn--lg" viewTransition>
-                Report from your phone
+                Get the app
               </Link>
             </div>
           </div>
@@ -320,8 +320,8 @@ export default function Mission() {
               </li>
             </ul>
             <div className="btn-row">
-              <Link to="/app/drive" className="btn btn--dark" viewTransition>
-                Start a Quest Drive
+              <Link to="/app" className="btn btn--dark" viewTransition>
+                Quest Drive is in the app
               </Link>
               <Link to="/how" className="btn btn--ghost-dark" viewTransition>
                 How roles work

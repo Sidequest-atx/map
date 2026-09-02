@@ -12,6 +12,7 @@ import { getStore, useDrives, useReports } from "../data/store";
 import { exportCsv, exportGeoJSON } from "../lib/export";
 import { daysBetween, fmtInt, median, relativeDays, shortDate } from "../lib/format";
 import { downscalePhoto } from "../lib/image";
+import { DEMO } from "../lib/supabase";
 import {
   fixPath,
   HAZARD_SHORT,
@@ -113,9 +114,11 @@ export default function Portal() {
           <button className="btn btn--sm" onClick={() => exportGeoJSON(reports.filter((r) => !r.duplicateOf))}>
             <Download style={{ width: 16, height: 16 }} /> GeoJSON
           </button>
-          <button className="btn btn--sm btn--ghost" onClick={() => setResetOpen(true)}>
-            Reset demo
-          </button>
+          {DEMO && (
+            <button className="btn btn--sm btn--ghost" onClick={() => setResetOpen(true)}>
+              Reset demo
+            </button>
+          )}
         </div>
       </div>
 

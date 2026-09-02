@@ -1,11 +1,14 @@
 import { useSyncExternalStore } from "react";
 import { makeRef } from "../lib/format";
+import { DEMO } from "../lib/supabase";
 import type { DriveSession, HazardReport, ReportStatus } from "../types";
+import { SupabaseStore } from "./remote";
 import { DEMO_REPORTER, SEED_DRIVES, SEED_REPORTS } from "./seed";
 
 /**
- * Storage abstraction so the prototype runs on localStorage today and can move
- * to Supabase (see /supabase/schema.sql) without touching any UI code.
+ * Storage abstraction. The live store is Supabase (src/data/remote.ts,
+ * schema in /supabase/schema.sql); VITE_DEMO=1 swaps in the original
+ * localStorage prototype with seeded NW Austin data.
  *
  * Rules the store enforces regardless of backend:
  *  - a report cannot become "resolved" without an after-photo
@@ -170,7 +173,7 @@ class LocalStorageStore implements ReportStore {
 let instance: ReportStore | null = null;
 
 export function getStore(): ReportStore {
-  if (!instance) instance = new LocalStorageStore();
+  if (!instance) instance = DEMO ? new LocalStorageStore() : new SupabaseStore();
   return instance;
 }
 

@@ -11,45 +11,31 @@ const Mission = lazy(() => import("./pages/Mission"));
 const MapExplorer = lazy(() => import("./pages/MapExplorer"));
 const How = lazy(() => import("./pages/How"));
 const Data = lazy(() => import("./pages/Data"));
-const AppHome = lazy(() => import("./pages/app/Home"));
+const GetApp = lazy(() => import("./pages/GetApp"));
 const SignIn = lazy(() => import("./pages/app/SignIn"));
-const Report = lazy(() => import("./pages/app/Report"));
-const Drive = lazy(() => import("./pages/app/Drive"));
 const Portal = lazy(() => import("./pages/Portal"));
 
 const S = (el: React.ReactNode) => <Suspense fallback={<PageLoading />}>{el}</Suspense>;
 
+// Photos are captured in the iPhone app only; the website is the public map
+// and the moderator portal. Old /app/report and /app/drive links land on /app.
 const router = createBrowserRouter([
   {
     element: <SiteLayout />,
     children: [
-      { path: "/", element: import.meta.env.VITE_SURFACE === "app" ? <Navigate to="/app" replace /> : S(<Mission />) },
+      { path: "/", element: S(<Mission />) },
       { path: "/map", element: S(<MapExplorer />) },
       { path: "/how", element: S(<How />) },
       { path: "/data", element: S(<Data />) },
+      { path: "/app", element: S(<GetApp />) },
+      { path: "/app/report", element: <Navigate to="/app" replace /> },
+      { path: "/app/drive", element: <Navigate to="/app" replace /> },
     ],
   },
   {
     element: <AppLayout />,
     children: [
-      { path: "/app", element: S(<AppHome />) },
       { path: "/app/signin", element: S(<SignIn />) },
-      {
-        path: "/app/report",
-        element: S(
-          <RequireRole role="reporter">
-            <Report />
-          </RequireRole>,
-        ),
-      },
-      {
-        path: "/app/drive",
-        element: S(
-          <RequireRole role="drive-captain">
-            <Drive />
-          </RequireRole>,
-        ),
-      },
       {
         path: "/portal",
         element: S(

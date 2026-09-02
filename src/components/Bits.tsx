@@ -2,12 +2,13 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Motif } from "./Motif";
 import { allDemo, useReports } from "../data/store";
+import { DEMO } from "../lib/supabase";
 import { HAZARD_SHORT, SEVERITY_LABELS, STATUS_LABELS, type HazardReport, type HazardType, type ReportStatus, type Severity } from "../types";
 
-/** Shown wherever seed data is on screen, until a real report exists. */
+/** Shown wherever seed data is on screen (VITE_DEMO=1 only), until a real report exists. */
 export function DemoBadge({ className = "" }: { className?: string }) {
   const reports = useReports();
-  if (!allDemo(reports)) return null;
+  if (!DEMO || !allDemo(reports)) return null;
   return (
     <span className={`badge badge--demo demo-badge ${className}`} title="Synthetic Northwest Austin data for the prototype. Cleared the moment real reports arrive.">
       Demo data

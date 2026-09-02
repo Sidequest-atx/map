@@ -108,6 +108,49 @@ function Tree({ r }: { r: number }) {
   );
 }
 
+/** Plan-view hazard barricade: striped board on two feet, set across the walk. */
+function Barricade({ id }: { id: string }) {
+  return (
+    <g>
+      <clipPath id={id}>
+        <rect x="-30" y="-6.5" width="60" height="13" rx="2.5" />
+      </clipPath>
+      <rect x="-32" y="-9" width="7" height="18" rx="1.5" fill="var(--olive-800)" opacity="0.5" />
+      <rect x="25" y="-9" width="7" height="18" rx="1.5" fill="var(--olive-800)" opacity="0.5" />
+      <rect x="-30" y="-6.5" width="60" height="13" rx="2.5" fill="var(--surface)" />
+      <g clipPath={`url(#${id})`}>
+        {[-36, -20, -4, 12, 28].map((x0) => (
+          <path key={x0} d={`M${x0} 8 L${x0 + 13} -8 L${x0 + 21} -8 L${x0 + 8} 8 Z`} fill="var(--sev-moderate)" opacity="0.9" />
+        ))}
+      </g>
+      <rect x="-30" y="-6.5" width="60" height="13" rx="2.5" fill="none" stroke="var(--line-strong)" strokeWidth="1.6" />
+    </g>
+  );
+}
+
+/* Wear is the default state of this walk. Hand-placed between the story
+   scenes, thinning to nothing after the fresh panel near the end. */
+const CRACK_PATHS = [
+  "M-26 -4 L-15 -1 L-4 -7 L7 -2 L17 -6 L26 -2 M-4 -7 L-8 -18",
+  "M26 6 L15 9 L5 3 L-3 8 M5 3 L1 -8",
+  "M-5 -36 L-1 -16 L-8 2 L-2 20 L-7 38 M-8 2 L-19 9",
+  "M-26 -18 L-13 -11 L-8 2 L-12 14",
+];
+const CRACKS: [number, number, boolean][] = [
+  [0.045, 0, false], [0.075, 2, true], [0.115, 1, false], [0.148, 3, false],
+  [0.222, 0, true], [0.248, 2, false], [0.298, 1, true],
+  [0.375, 0, false], [0.408, 2, true], [0.44, 3, false], [0.455, 1, false],
+  [0.545, 0, false], [0.578, 2, true], [0.612, 1, false],
+  [0.688, 3, true], [0.715, 0, false], [0.748, 2, false],
+  [0.832, 1, true], [0.862, 0, false],
+];
+const CHIPS: [number, number][] = [
+  [0.06, 1], [0.155, -1], [0.235, 1], [0.43, -1], [0.53, 1], [0.705, -1], [0.845, 1],
+];
+const STAINS: [number, number, number][] = [
+  [0.1, 46, 0.07], [0.255, 58, 0.1], [0.395, 44, 0.06], [0.565, 52, 0.09], [0.72, 40, 0.06], [0.86, 48, 0.08],
+];
+
 export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
   const reduced = useReducedMotion();
   const pts = useMemo(() => samplePath(PATH_D), []);
@@ -211,13 +254,76 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
               <Manhole r={7} />
             </Scene>
 
-            {/* ---- never built: the ribbon simply stops for a stretch ---- */}
+            {/* everyday wear: stained panels, cracks, chipped-off edges */}
+            {STAINS.map(([f, len, o], i) => (
+              <Scene key={`st${i}`} pts={pts} f={f}>
+                <rect x={-RIBBON / 2 + 2} y={-len / 2} width={RIBBON - 4} height={len} fill="var(--olive-800)" opacity={o} />
+              </Scene>
+            ))}
+            {CRACKS.map(([f, v, flip], i) => (
+              <Scene key={`cr${i}`} pts={pts} f={f}>
+                <path
+                  d={CRACK_PATHS[v]}
+                  transform={flip ? "scale(-1 1)" : undefined}
+                  fill="none"
+                  stroke="var(--line-strong)"
+                  strokeWidth="1.9"
+                  strokeLinejoin="round"
+                  opacity={0.55 + (i % 3) * 0.12}
+                />
+              </Scene>
+            ))}
+            {CHIPS.map(([f, side], i) => (
+              <Scene key={`ch${i}`} pts={pts} f={f}>
+                <g transform={`scale(${side} 1)`}>
+                  <circle cx={RIBBON / 2 + 2} cy="0" r="6.5" fill="var(--field)" />
+                  <path d={`M${RIBBON / 2 - 5} -6 L${RIBBON / 2 - 1} -1 L${RIBBON / 2 - 6} 5`} fill="none" stroke="var(--line-strong)" strokeWidth="1.5" opacity="0.6" />
+                </g>
+              </Scene>
+            ))}
+
+            {/* cars parked in the driveways; the middle one noses across the walk */}
+            <Scene pts={pts} f={0.13} d={-66}>
+              <g transform="rotate(90)">
+                <Car tone={0.4} />
+              </g>
+            </Scene>
+            <Scene pts={pts} f={0.47} d={-6}>
+              <g transform="rotate(90)">
+                <Car tone={0.5} />
+              </g>
+            </Scene>
+            <Scene pts={pts} f={0.76} d={-60}>
+              <g transform="rotate(-90)">
+                <Car tone={0.38} />
+              </g>
+            </Scene>
+
+            {/* ---- never built: the ribbon stops square, barricaded, and a dirt
+                 desire line is worn through where people walk anyway ---- */}
             <Scene pts={pts} f={SCENES.missing}>
               <rect x={-RIBBON / 2 - 5} y={-95} width={RIBBON + 10} height={190} fill="var(--field)" />
-              <path d={`M${-RIBBON / 2} -95 L${-RIBBON / 2} 95 M${RIBBON / 2} -95 L${RIBBON / 2} 95`} stroke="var(--line)" strokeWidth="1.6" strokeDasharray="5 7" opacity="0.8" />
-              {[-64, -30, 4, 38, 70].map((yy, i) => (
-                <circle key={i} cx={i % 2 ? 7 : -6} cy={yy} r="2.3" fill="var(--olive-700)" opacity="0.4" />
+              <path d={`M${-RIBBON / 2} -95 L${RIBBON / 2} -95 M${-RIBBON / 2} 95 L${RIBBON / 2} 95`} stroke="var(--line-strong)" strokeWidth="2.6" opacity="0.75" />
+              <path d={`M${-RIBBON / 2} -88 L${-RIBBON / 2} 88 M${RIBBON / 2} -88 L${RIBBON / 2} 88`} stroke="var(--line)" strokeWidth="1.5" strokeDasharray="4 9" opacity="0.65" />
+              <path d="M3 -95 C 13 -60, -13 -26, 4 8 C 15 36, -7 66, 2 95" fill="none" stroke="var(--olive-700)" strokeWidth="12" strokeLinecap="round" opacity="0.2" />
+              <path d="M3 -95 C 13 -60, -13 -26, 4 8 C 15 36, -7 66, 2 95" fill="none" stroke="var(--olive-800)" strokeWidth="2" strokeDasharray="6 10" opacity="0.35" />
+              {(
+                [
+                  [-13, -70],
+                  [12, -34],
+                  [-11, 2],
+                  [13, 30],
+                  [-9, 62],
+                ] as const
+              ).map(([xx, yy], i) => (
+                <circle key={i} cx={xx} cy={yy} r="2.2" fill="var(--olive-700)" opacity="0.45" />
               ))}
+              <g transform="translate(0 104)">
+                <Barricade id="nb-near" />
+              </g>
+              <g transform="translate(0 -104)">
+                <Barricade id="nb-far" />
+              </g>
             </Scene>
             <Scene pts={pts} f={SCENES.missing} rotate={false}>
               <text x="48" y="5" fontSize="15" fill="var(--ink-mute)" fontFamily="var(--font-mono)">

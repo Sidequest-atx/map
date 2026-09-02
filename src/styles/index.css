@@ -16,11 +16,17 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 
 /* The olive/beige system, exposed to Tailwind. `inline` keeps utilities
-   referencing the live CSS variables from tokens.css. */
+   referencing the live CSS variables from tokens.css.
+   EXCEPTION — fonts are literal stacks (keep in sync with tokens.css):
+   `--font-serif: var(--font-serif)` makes Tailwind emit that exact
+   self-reference into the `theme` layer, which out-cascades the site layer
+   and turns the variable into a cycle → invalid → the entire site falls
+   back to Times New Roman. Same for --font-mono. Never alias a theme key
+   to a CSS variable of the same name. */
 @theme inline {
-  --font-serif: var(--font-serif);
-  --font-sans: var(--font-ui);
-  --font-mono: var(--font-mono);
+  --font-serif: "IBM Plex Sans", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "IBM Plex Sans", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --color-field: var(--field);
   --color-field-2: var(--field-2);

@@ -102,7 +102,7 @@ export default function App() {
               options={{
                 title: "Map",
                 headerShown: true,
-                headerTitle: "The shared map",
+                headerTitle: "Live map",
                 headerTitleStyle: { color: C.ink, fontWeight: "600" },
                 headerStyle: { backgroundColor: C.field, shadowColor: "transparent", elevation: 0 },
                 tabBarIcon: ({ color, size }) => <Ionicons name="map-outline" color={color} size={size} />,

@@ -247,7 +247,7 @@ export function DriveScreen({ navigation }: ScreenProps<"Drive">) {
         <Stack gap={SP.lg}>
           <View>
             <H1>Quest Drive.</H1>
-            <P soft>One person drives. You capture from the passenger seat. Frames are placed on the GPS trail, deduplicated after you stop, and you review every one before anything reaches the ledger.</P>
+            <P soft>Shoot from the passenger seat while someone else drives. You review every frame before anything reaches the map.</P>
           </View>
           {resumable ? (
             <Notice tone="warn">
@@ -269,7 +269,7 @@ export function DriveScreen({ navigation }: ScreenProps<"Drive">) {
           ) : null}
           <Notice tone="warn">
             <P>
-              <Text style={{ fontWeight: "700" }}>Passenger only.</Text> The driver drives. Keep speed under 25 mph on residential streets for usable frames.
+              <Text style={{ fontWeight: "700" }}>Passenger only.</Text> The driver drives. Under 25 mph keeps the frames usable.
             </P>
           </Notice>
           <Card>
@@ -285,7 +285,7 @@ export function DriveScreen({ navigation }: ScreenProps<"Drive">) {
             />
           </Card>
           <Button title="Start the drive" variant="primary" size="lg" block onPress={begin} />
-          <Small>Drive-captured reports are marked on the map and get confirmed on foot before 311 submission when needed.</Small>
+          <Small>Drive captures are confirmed on foot before anything goes to 311.</Small>
         </Stack>
       </Screen>
     );
@@ -356,7 +356,7 @@ export function DriveScreen({ navigation }: ScreenProps<"Drive">) {
                 <Text style={T.mono}>{Math.round(progress * 100)}%</Text>
               </Row>
               <ActivityIndicator color={C.olive600} />
-              <Small>Then deduplicating within the batch and against the ledger. Nothing is posted yet.</Small>
+              <Small>Duplicates get removed next. Nothing is posted yet.</Small>
             </Card>
           )}
         </View>
@@ -377,7 +377,7 @@ export function DriveScreen({ navigation }: ScreenProps<"Drive">) {
         <Stack gap={SP.lg}>
           <View>
             <H1>Review {frames.length} candidates.</H1>
-            <P soft>{acceptedCount} accepted. Frames that match an open report are unchecked by default; accept them to add the photo anyway.</P>
+            <P soft>{acceptedCount} accepted. Frames matching an existing report start unchecked.</P>
           </View>
           <Row gap={SP.sm} align="stretch">
             <KPI value={miles.toFixed(2)} label="miles covered" />

@@ -76,21 +76,19 @@ export function HomeScreen({ navigation }: ScreenProps<"Home">) {
             <Text style={styles.heroGlyph}>◉</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.heroTitle}>Report a hazard</Text>
-              <Text style={styles.heroSub}>Rear camera · GPS locked at the shutter · pin you can nudge</Text>
+              <Text style={styles.heroSub}>One photo. The exact spot is pinned for you.</Text>
             </View>
             <Text style={styles.heroArrow}>→</Text>
           </Pressable>
           <Row gap={SP.sm} align="stretch">
-            <ActionTile title="Glasses Walk" sub="Meta glasses shoot, phone keeps the trail" onPress={() => navigation.navigate("GlassesWalk")} />
-            <ActionTile title="Quest Drive" sub="Passenger-seat batch capture" onPress={() => navigation.navigate("Drive")} />
+            <ActionTile title="Glasses Walk" sub="Shoot with glasses; the phone maps it" onPress={() => navigation.navigate("GlassesWalk")} />
+            <ActionTile title="Quest Drive" sub="Cover a whole street from the passenger seat" onPress={() => navigation.navigate("Drive")} />
           </Row>
           <Button title={reports.length ? `All reports (${reports.length})` : "Reports"} onPress={() => navigation.navigate("Reports")} block />
         </Stack>
 
         {reports.length === 0 ? (
-          <Small style={{ color: C.inkMute }}>
-            Nothing captured on this phone yet. The first photo you take becomes SQ-P0001. Photos also land in a "SideQuest ATX" album in Photos with their coordinates written into the file.
-          </Small>
+          <Small style={{ color: C.inkMute }}>Nothing here yet. Your first photo becomes report SQ-P0001 and lands on the map.</Small>
         ) : null}
       </View>
     </Screen>

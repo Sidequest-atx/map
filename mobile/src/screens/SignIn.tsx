@@ -40,7 +40,7 @@ export function SignInScreen() {
           <View style={styles.hero}>
             <Image source={require("../../assets/splash-icon.png")} style={{ width: 72, height: 72 }} />
             <Text style={T.display}>SideQuest ATX</Text>
-            <P soft>Photograph every broken, blocked, or missing sidewalk in Austin. Every photo lands on the shared map with the exact panel it shows.</P>
+            <P soft>Photograph broken sidewalks. Every photo lands on Austin's shared map, pinned to the exact spot.</P>
           </View>
           <Card>
             <Stack gap={SP.lg}>
@@ -98,10 +98,7 @@ export function SignInScreen() {
               />
             </Stack>
           </Card>
-          <Small style={{ color: C.inkMute }}>
-            Photos of the public right-of-way only. No faces, plates, or house numbers get published. Reports are saved on this phone first and
-            upload to the shared map whenever there is a connection.
-          </Small>
+          <Small style={{ color: C.inkMute }}>Public sidewalks only; no faces or plates are ever published. Works offline; reports upload when you have a connection.</Small>
         </Stack>
       </Screen>
     </KeyboardAvoidingView>

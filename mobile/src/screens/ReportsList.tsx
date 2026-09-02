@@ -36,7 +36,7 @@ export function ReportsListScreen({ navigation }: ScreenProps<"Reports">) {
         ListEmptyComponent={
           <Empty
             title={reports.length ? "Nothing in this filter." : "No reports on this phone yet."}
-            body={reports.length ? "Switch the filter above." : "Take the first photo and it shows up here, on the map, and in the SideQuest ATX album."}
+            body={reports.length ? "Switch the filter above." : "Take the first photo and it shows up here and on the map."}
             action={reports.length ? undefined : <Button title="Report a hazard" variant="primary" onPress={() => navigation.navigate("Report")} />}
           />
         }

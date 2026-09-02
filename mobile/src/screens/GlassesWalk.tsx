@@ -273,22 +273,22 @@ export function GlassesWalkScreen({ navigation }: ScreenProps<"GlassesWalk">) {
         <Stack gap={SP.lg}>
           <View>
             <H1>Glasses Walk.</H1>
-            <P soft>Meta glasses have a camera and a shutter button but no GPS. Your phone has GPS. Put them together: the glasses shoot, the phone in your pocket keeps the trail, and every photo lands on the map where you were standing.</P>
+            <P soft>The glasses shoot; the phone in your pocket keeps the GPS trail. Every photo lands on the map where you stood.</P>
           </View>
           <Card>
             <H2>How it works</H2>
             <Stack gap={6}>
-              <P>1. Start the walk here, then pocket the phone. It records a GPS breadcrumb every few metres, screen off.</P>
-              <P>2. Walk. Press the capture button on the glasses at every hazard. Say nothing; there is no voice step.</P>
-              <P>3. End the walk. Open the Meta AI app so the captures import to your camera roll (or turn on auto-import once).</P>
-              <P>4. Back here, the photos taken during the walk are found by time and placed on the trail. You confirm each one.</P>
+              <P>1. Start the walk, pocket the phone.</P>
+              <P>2. Press the glasses' capture button at every hazard.</P>
+              <P>3. End the walk, then open the Meta AI app so the photos import.</P>
+              <P>4. The photos appear here, placed on your trail. Confirm each one.</P>
             </Stack>
           </Card>
           <Notice>
-            <P>iOS will ask for location access "Always". That is only used while a walk is active, and the OS shows a blue indicator the whole time.</P>
+            <P>iOS will ask for location "Always". It is only used while a walk is active.</P>
           </Notice>
           <Button title="Start a walk" variant="primary" size="lg" block onPress={() => void begin()} />
-          <Small>Works with any camera that lacks GPS: an old point-and-shoot, a bike-mounted action cam, or a friend's phone with location off.</Small>
+          <Small>Works with any camera that lacks GPS, not just glasses.</Small>
         </Stack>
       </Screen>
     );
@@ -312,7 +312,7 @@ export function GlassesWalkScreen({ navigation }: ScreenProps<"GlassesWalk">) {
           <TrailMap trail={trail} height={280} />
           {trail.length === 0 ? <Notice tone="warn">No breadcrumbs yet. Step outside; the first fix can take 10 to 30 seconds.</Notice> : null}
           <Card tone="field">
-            <P>Snap with the glasses' capture button at every hazard. Keep the phone in a pocket; you do not need to touch it until the end.</P>
+            <P>Snap with the glasses at every hazard. The phone stays in your pocket until the end.</P>
           </Card>
           <Button title="Discard walk" variant="ghost" size="sm" onPress={discard} />
         </Stack>

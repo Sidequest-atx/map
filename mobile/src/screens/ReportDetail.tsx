@@ -135,7 +135,7 @@ export function ReportDetailScreen({ route, navigation }: ScreenProps<"ReportDet
           <Small>Taken {shortDateTime(r.createdAt)}</Small>
           <Row>
             <Button title="Open in Maps" size="sm" onPress={openInMaps} />
-            <Button title="Check the file's GPS tag" size="sm" onPress={() => void checkExif()} />
+            <Button title="Check GPS tag" size="sm" onPress={() => void checkExif()} />
             {r.photoUri ? <Button title="Share photo" size="sm" onPress={() => void sharePhoto(r.photoUri!, r.ref)} /> : null}
           </Row>
           {exifCheck ? <Small style={{ color: C.olive800 }}>{exifCheck}</Small> : null}
@@ -146,7 +146,7 @@ export function ReportDetailScreen({ route, navigation }: ScreenProps<"ReportDet
             <H2>Priority {rank.score}</H2>
             <Badge tone={rank.score >= 75 ? "danger" : rank.score >= 55 ? "warn" : "field"}>{priorityLabel(rank.score)}</Badge>
           </Row>
-          <Small>Trip risk {rank.risk} · who walks here {rank.exposure} · waiting {rank.age}</Small>
+          <Small>Trip risk {rank.risk} · foot traffic {rank.exposure} · waiting {rank.age}</Small>
           {rank.anchors.length ? <Small>Near {rank.anchors.map((a) => `${a.place.name} (${a.distanceM} m)`).join(", ")}</Small> : <Small>No school, transit, senior, or clinic anchor within 600 m.</Small>}
           <Small>Fix path: {fixPath(r.type) === "landowner" ? "adjacent landowner (vegetation)" : "City of Austin"}</Small>
         </Card>
@@ -179,7 +179,7 @@ export function ReportDetailScreen({ route, navigation }: ScreenProps<"ReportDet
             <Button title="Delete report" variant="danger" size="sm" onPress={remove} loading={busy} />
           </Card>
         ) : (
-          <Small>Signed in as {session?.role.replace("-", " ")}. Status changes need the moderator role, which is granted by SideQuest, not chosen on the phone.</Small>
+          <Small>Only moderators can change a report's status.</Small>
         )}
       </Stack>
     </Screen>

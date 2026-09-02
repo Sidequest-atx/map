@@ -318,7 +318,7 @@ The photo is still in the app's folder; try Submit again.`);
           {error ? <Text style={styles.camWarn}>{error}</Text> : null}
         </View>
         <View style={[styles.camBottom, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
-          <Text style={styles.camHint}>Frame the panel. Stand on the sidewalk, not in the street.</Text>
+          <Text style={styles.camHint}>Fill the frame with the hazard. Stay out of the street.</Text>
           <View style={styles.camRow}>
             <Pressable onPress={pickFromLibrary} style={styles.camSide} accessibilityLabel="Choose from Photos">
               <Text style={styles.camSideText}>Photos</Text>
@@ -350,7 +350,7 @@ The photo is still in the app's folder; try Submit again.`);
             <H1>{merged ? "Added to the record." : "It is on the map."}</H1>
             <Badge tone="olive">{target?.ref ?? submitted.ref}</Badge>
             <P soft style={{ textAlign: "center" }}>
-              {merged ? "Your photo strengthens an existing report instead of splitting the count." : "Recorded on this phone with the photo, the pin, and the GPS fix that produced it."}
+              {merged ? "Your photo strengthens an existing report instead of splitting the count." : "On its way to the shared map with the photo and the exact pin."}
             </P>
             {albumNote ? <Small style={{ textAlign: "center" }}>{albumNote}</Small> : null}
           </View>
@@ -402,7 +402,7 @@ The photo is still in the app's folder; try Submit again.`);
         <Stack gap={SP.lg}>
           <View>
             <H1>What is it?</H1>
-            <P soft>{classifierAvailable() ? "The model suggests. You decide." : "No vision model on this build; you pick. The photo is saved either way."}</P>
+            <P soft>{classifierAvailable() ? "The model suggests. You decide." : "Pick the type and severity. The photo is already saved."}</P>
           </View>
           <View style={styles.preview}>
             <Image source={{ uri: draft.photo.thumbUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -418,7 +418,7 @@ The photo is still in the app's folder; try Submit again.`);
               <Row justify="space-between">
                 <Row gap={6}>
                   <Badge tone="ai">AI</Badge>
-                  <Text style={T.h2}>Vision read</Text>
+                  <Text style={T.h2}>Suggestion</Text>
                 </Row>
                 {ai ? <Small>{ai.model}</Small> : null}
               </Row>
@@ -449,7 +449,7 @@ The photo is still in the app's folder; try Submit again.`);
                   ) : null}
                 </Stack>
               ) : (
-                <P soft>The classifier did not answer. Pick the type yourself below.</P>
+                <P soft>No suggestion this time. Pick below.</P>
               )}
             </Card>
           ) : null}
@@ -480,12 +480,12 @@ The photo is still in the app's folder; try Submit again.`);
         <Stack gap={SP.lg}>
           <View>
             <H1>Where is it?</H1>
-            <P soft>Drag the pin onto the exact panel. The ring is the GPS accuracy at the shutter.</P>
+            <P soft>Drag the pin to the exact spot.</P>
           </View>
           <PinPicker coords={coords} accuracyM={moved && moved > 0.5 ? null : acc} onChange={setCoords} heading={draft.headingDeg} style={{ height: 320 }} />
           <Card>
             <Row justify="space-between">
-              <Text style={T.h2}>Fix</Text>
+              <Text style={T.h2}>GPS</Text>
               <Button title="Recenter to GPS" size="sm" onPress={recenterToGps} disabled={!gps.best && !gps.fix} />
             </Row>
             <Row gap={SP.md}>
@@ -493,8 +493,8 @@ The photo is still in the app's folder; try Submit again.`);
               {acc != null ? <Small>±{Math.round(acc)} m at shutter</Small> : null}
               {draft.headingDeg != null ? <Small>facing {cardinal(draft.headingDeg)} {Math.round(draft.headingDeg)}°</Small> : null}
             </Row>
-            {moved != null && moved > 0.5 ? <Small style={{ color: C.sevModerate }}>Pin moved {Math.round(moved)} m from the GPS fix. Recorded as pin-adjusted.</Small> : null}
-            {draft.method === "manual" && !draft.origin ? <Notice tone="warn">No GPS fix at capture. Place the pin by hand or tap Recenter once the fix arrives.</Notice> : null}
+            {moved != null && moved > 0.5 ? <Small style={{ color: C.sevModerate }}>Pin moved {Math.round(moved)} m from where GPS put it. Noted on the record.</Small> : null}
+            {draft.method === "manual" && !draft.origin ? <Notice tone="warn">No GPS at capture. Drag the pin yourself, or tap Recenter once GPS locks.</Notice> : null}
             {gps.status === "locked" && gps.best && draft.fix && (gps.best.accuracyM ?? 99) < (draft.fix.accuracyM ?? 99) - 3 && !(moved && moved > 0.5) ? (
               <Small>A better fix is available now (±{Math.round(gps.best.accuracyM ?? 0)} m). Recenter to use it.</Small>
             ) : null}
@@ -521,7 +521,7 @@ The photo is still in the app's folder; try Submit again.`);
             </Small>
           ) : null}
 
-          <Field label="Describe the spot" hint={placeAuto ? `Suggested: ${placeAuto}` : "Finding the street…"}>
+          <Field label="Name the spot" hint={placeAuto ? `Suggested: ${placeAuto}` : "Finding the street…"}>
             <Input value={place} onChangeText={setPlace} placeholder={placeAuto ?? "e.g. 1200 block of Mellow Meadow Dr"} autoCapitalize="words" />
           </Field>
         </Stack>
@@ -557,7 +557,7 @@ The photo is still in the app's folder; try Submit again.`);
               {place.trim() || placeAuto || nearestFallback(draft.coords)} · {neighborhood}
             </Small>
             <Small>
-              Submitting as <Text style={{ fontWeight: "700" }}>{session?.name}</Text>. Photo, pin, and type are public once exported; your name shows on the record.
+              Submitting as <Text style={{ fontWeight: "700" }}>{session?.name}</Text>. The photo and pin go on the public map with your name.
             </Small>
           </Card>
         </Stack>

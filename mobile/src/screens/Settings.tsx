@@ -84,7 +84,7 @@ export function SettingsScreen(_: ScreenProps<"Settings">) {
           <Row justify="space-between">
             <View style={{ flex: 1 }}>
               <P>Glasses clock offset</P>
-              <Small>Seconds added to a glasses photo's timestamp before matching it to the trail. Leave at 0 unless pins land consistently early or late.</Small>
+              <Small>Leave at 0 unless Glasses Walk pins land consistently early or late.</Small>
             </View>
             <Row gap={4}>
               <Button title="−5" size="sm" onPress={() => setPrefs({ glassesClockOffsetS: prefs.glassesClockOffsetS - 5 })} />
@@ -97,7 +97,7 @@ export function SettingsScreen(_: ScreenProps<"Settings">) {
         <Card>
           <H2>Export</H2>
           <Small>
-            {reports.length} reports · {stats.files} photo files · {(stats.bytes / 1_048_576).toFixed(1)} MB on this phone. Exports carry the pin, type, severity, GPS accuracy, and the photo filename; photos travel via the Photos album or per-report Share.
+            {reports.length} reports · {stats.files} photos · {(stats.bytes / 1_048_576).toFixed(1)} MB on this phone.
           </Small>
           <Row>
             <Button title="Share GeoJSON" variant="primary" size="sm" onPress={() => void guard(() => shareGeoJSON(reports))} disabled={!reports.length} />
@@ -108,9 +108,9 @@ export function SettingsScreen(_: ScreenProps<"Settings">) {
         <Card>
           <H2>About this build</H2>
           <Small>Version {version}</Small>
-          <Small>Vision model: {classifierName()} — suggests type and severity from the photo using published sidewalk-condition criteria (PROWAG displacement tiers, FHWA crack classes); you confirm every read, and the model name is recorded on the report. Budget-capped server-side; when the cap is hit you simply pick by hand.</Small>
-          <Small>Maps: Apple Maps for pinning, Mapbox for the shared map tab. Location: precise, only while capturing, plus Always during a Glasses Walk (the OS shows a blue indicator).</Small>
-          <Small>Reports and their photos upload to the shared public map (sidequestatx.org data, CC BY 4.0). Photos of the public right-of-way only; no faces, plates, or house numbers get published.</Small>
+          <Small>Vision model: {classifierName()}. It suggests type and severity from published sidewalk criteria; a person confirms every read.</Small>
+          <Small>Location is used only while capturing, plus during a Glasses Walk.</Small>
+          <Small>Reports are public data (CC BY 4.0). No faces, plates, or house numbers get published.</Small>
         </Card>
       </Stack>
     </Screen>

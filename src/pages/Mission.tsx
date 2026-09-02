@@ -1,21 +1,36 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { motion, useMotionValueEvent, useReducedMotion, useScroll, useTransform } from "motion/react";
 import { CountUp } from "../components/CountUp";
-import { Motif } from "../components/Motif";
-import { Marquee } from "../components/ui/marquee";
-import { NEIGHBORHOODS } from "../data/places";
 import { useReports } from "../data/store";
 import { fmtInt } from "../lib/format";
 import { staticMapUrl, useMapboxToken } from "../lib/mapbox";
 
 /**
- * The landing page in the Atlas grammar: a narrative rail of numbers on the
- * left, the map as evidence on the right. The magnitude is the City's own;
- * our live counts sit underneath and never round up.
+ * The landing is a narrated report in the Confidanz Atlas grammar: one fact
+ * per viewport, sourced under the element it belongs to, and the scroll ends
+ * by handing the reader the live map. Every figure here is the City's, the
+ * CDC's, or a federal court's; our own count starts at zero on the map.
  */
+
+const CHAPTERS = [
+  { id: "missing", label: "Never built" },
+  { id: "broken", label: "Failing" },
+  { id: "math", label: "The math" },
+  { id: "falls", label: "The falls" },
+  { id: "precedent", label: "The precedent" },
+  { id: "count", label: "The count" },
+] as const;
+
+const PLAN_URL = "https://www.austintexas.gov/transportation-public-works/sidewalks-crossings-and-shared-streets-plan";
+const CDC_URL = "https://www.cdc.gov/falls/data-research/facts-stats/index.html";
+const AJPH_URL = "https://pubmed.ncbi.nlm.nih.gov/16735616/";
+const WILLITS_URL = "https://legalaidatwork.org/willits-v-city-of-los-angeles-sidewalk-settlement-announced-2/";
+
 export default function Mission() {
   const reports = useReports();
   const { token: mapboxToken } = useMapboxToken();
+  const reduced = useReducedMotion();
 
   const live = useMemo(() => {
     const real = reports.filter((r) => !r.duplicateOf);
@@ -27,172 +42,399 @@ export default function Mission() {
   }, [reports]);
 
   const mapUrl = useMemo(
-    () => (mapboxToken ? staticMapUrl(reports.filter((r) => r.status !== "resolved").slice(0, 60), 1280, 1280) : null),
+    () => (mapboxToken ? staticMapUrl(reports.filter((r) => r.status !== "resolved").slice(0, 60), 1280, 960) : null),
     [reports, mapboxToken],
   );
 
   return (
     <>
-      {/* ---- Split screen: rail of numbers + map as evidence ---- */}
-      <section className="flex min-h-[calc(100dvh-var(--topbar-h))] flex-col lg:flex-row">
-        <div className="shrink-0 border-b border-line bg-surface p-6 sm:p-8 lg:w-[27rem] lg:overflow-y-auto lg:border-r lg:border-b-0 xl:w-[30rem]">
-          <p className="font-sans text-[11px] font-semibold tracking-[0.14em] text-ink-mute uppercase">
+      <ChapterRail />
+
+      {/* ---- Prologue: the question nobody can answer ---- */}
+      <section
+        id="prologue"
+        className="relative grid min-h-[calc(100dvh-var(--topbar-h))] content-center overflow-hidden bg-olive-900 text-ink-on-dark"
+      >
+        <div className="wrap pb-16">
+          <p className="font-sans text-[11px] font-semibold tracking-[0.14em] text-ink-on-dark-soft uppercase">
             SideQuest ATX · Northwest Austin
           </p>
-
-          <h1 className="mt-3 font-serif text-[2.5rem] leading-[1.04] font-medium tracking-[-0.02em] xl:text-[2.8rem]">
-            Miles you can't walk.
+          <h1 className="mt-4 max-w-3xl font-serif text-[clamp(2.3rem,5.2vw,3.8rem)] leading-[1.06] font-medium tracking-[-0.02em] text-balance">
+            How many of Austin's sidewalks could put someone on the ground?
           </h1>
-
-          <p className="mt-4 font-sans text-[0.95rem] leading-relaxed text-ink-soft">
-            Austin knows its sidewalks are broken. Nobody counts them panel by panel, so nothing gets fixed. We photograph
-            every hazard, put it on a public map, and track it until a second photo proves the repair.
-          </p>
-
-          <div
-            className="mt-6 rounded-[var(--r-md)] bg-olive-600/8 px-4 py-3"
-            title="City of Austin Sidewalk Program: absent sidewalk in the pedestrian network."
-          >
-            <div className="font-sans text-[2.6rem] leading-none font-bold tracking-tight text-olive-800 tabular-nums">
-              <CountUp value={1500} suffix=" mi" />
-            </div>
-            <div className="mt-1.5 font-sans text-[12px] text-ink-soft">of missing sidewalk in Austin</div>
-          </div>
-
-          <dl className="mt-5 space-y-2 font-sans text-[13px]">
-            <div
-              className="flex items-baseline justify-between gap-4"
-              title="City of Austin Sidewalk Program estimate for completing and repairing the network."
-            >
-              <dt className="text-ink-soft">Repair and construction backlog</dt>
-              <dd className="font-semibold text-ink tabular-nums">≈ $1B</dd>
-            </div>
-            <div className="flex items-baseline justify-between gap-4" title="At current funding levels, by the City's own math.">
-              <dt className="text-ink-soft">Completion at today's funding</dt>
-              <dd className="font-semibold text-ink tabular-nums">~a century</dd>
-            </div>
-            <div
-              className="flex items-baseline justify-between gap-4"
-              title="Miles rated deficient only because of vegetation. Clearing it is the adjacent landowner's job: no bond, no wait."
-            >
-              <dt className="text-ink-soft">Deficient from vegetation alone</dt>
-              <dd className="font-semibold text-ink tabular-nums">214 mi</dd>
-            </div>
-            <div
-              className="flex items-baseline justify-between gap-4"
-              title="CDC: about 1 in 4 adults 65+ falls each year; falls are the leading cause of injury death in that age group."
-            >
-              <dt className="text-ink-soft">Adults 65+ who fall each year</dt>
-              <dd className="font-semibold text-ink tabular-nums">1 in 4</dd>
-            </div>
-          </dl>
-
-          <p className="mt-4 rounded-[var(--r-md)] bg-field-2 px-3.5 py-2.5 font-sans text-[12px] leading-snug text-ink-soft">
-            Those are the City's and the CDC's numbers, not ours. Ours start at zero below, and we never round up.
-          </p>
-
-          <p className="mt-5 text-[0.95rem] leading-relaxed text-ink-soft italic">
-            Our 80-year-old grandmother broke her finger on a root-lifted panel nobody had reported.
-          </p>
-
-          <div className="btn-row mt-6">
-            <Link to="/map" className="btn btn--primary" viewTransition>
-              See the live map
-            </Link>
-            <Link to="/app" className="btn" viewTransition>
-              Get the app
-            </Link>
-          </div>
-
-          <div className="mt-6 border-t border-line pt-4">
-            <p className="flex items-center gap-2 font-sans text-[11px] font-semibold tracking-[0.14em] text-ink-mute uppercase">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-olive-500 opacity-60 motion-reduce:hidden" />
-                <span className="relative inline-flex size-2 rounded-full bg-olive-600" />
-              </span>
-              Our count · live
+          <Rise delay={0.6}>
+            <p className="mt-6 font-serif text-[clamp(1.5rem,3vw,2.1rem)] italic">Nobody knows.</p>
+          </Rise>
+          <Rise delay={1.1}>
+            <p className="mt-5 max-w-xl font-sans text-[0.95rem] leading-relaxed text-ink-on-dark-soft">
+              The City measures its network in miles. No one counts it panel by panel. Here is what the miles already
+              say, and where the counting starts.
             </p>
-            <div className="mt-2 flex gap-6 font-sans text-[13px]">
-              <span>
-                <b className="text-ink tabular-nums">{fmtInt(live.total)}</b> <span className="text-ink-mute">on file</span>
-              </span>
-              <span>
-                <b className="text-ink tabular-nums">{fmtInt(live.open)}</b> <span className="text-ink-mute">open</span>
-              </span>
-              <span>
-                <b className="text-ink tabular-nums">{fmtInt(live.fixed)}</b> <span className="text-ink-mute">verified fixed</span>
-              </span>
-            </div>
-          </div>
+          </Rise>
         </div>
-
-        <Link to="/map" viewTransition className="group relative block min-h-[42vh] flex-1 bg-field-2" aria-label="Open the live map">
-          {mapUrl ? (
-            <img src={mapUrl} alt="Map of Northwest Austin sidewalk hazards" className="absolute inset-0 h-full w-full object-cover" />
-          ) : (
-            <div className="absolute inset-0 grid place-items-center font-sans text-[13px] text-ink-mute">The map is loading.</div>
-          )}
-          <span className="absolute right-4 bottom-4 inline-flex items-center gap-2 rounded-full bg-olive-800 px-4 py-2 font-sans text-[13px] font-semibold text-ink-on-dark shadow-lg transition-transform duration-200 group-hover:scale-[1.03] motion-reduce:transition-none">
-            Open the live map →
-          </span>
-        </Link>
+        <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2" aria-hidden>
+          <span className="font-sans text-[10px] tracking-[0.2em] text-ink-on-dark-soft uppercase">Scroll</span>
+          <motion.span
+            className="block h-9 w-px origin-top bg-ink-on-dark-soft/70"
+            animate={reduced ? undefined : { scaleY: [0.15, 1, 0.15] }}
+            transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
+          />
+        </div>
       </section>
 
-      {/* ---- Neighborhood marquee ---- */}
-      <div className="border-y border-line bg-surface py-2.5" aria-hidden>
-        <Marquee speed="slow" pauseOnHover className="[--gap:2.5rem]">
-          {NEIGHBORHOODS.map((n) => (
-            <span key={n} className="flex items-center gap-10 font-sans text-[12px] tracking-[0.08em] whitespace-nowrap text-ink-mute uppercase">
-              {n}
-              <i className="size-1 rounded-full bg-olive-400" />
-            </span>
-          ))}
-        </Marquee>
-      </div>
+      {/* ---- Ch. 1: what was never built ---- */}
+      <Chapter id="missing">
+        <Claim>The first problem isn't broken sidewalk. It's sidewalk that was never built.</Claim>
+        <Rise delay={0.1}>
+          <p className="mt-6 font-sans text-[clamp(3.6rem,9vw,6.5rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+            <CountUp value={1500} suffix=" mi" duration={1.8} />
+          </p>
+          <p className="mt-2 font-sans text-[0.95rem] text-ink-soft">
+            of Austin street frontage with no sidewalk at all. About the drive from Austin to Washington, DC.
+          </p>
+        </Rise>
+        <Rise delay={0.2} className="mt-8 max-w-xl">
+          <div className="flex items-baseline justify-between font-sans text-[13px]">
+            <span className="text-ink-soft">Street frontage with a sidewalk</span>
+            <span className="font-semibold text-ink tabular-nums">2,800 of 4,800 mi</span>
+          </div>
+          <div className="mt-2">
+            <Bar pct={58} />
+          </div>
+        </Rise>
+        <Source href={PLAN_URL}>City of Austin, Sidewalks, Crossings &amp; Shared Streets Plan (2023)</Source>
+      </Chapter>
 
-      {/* ---- How it works, in one breath ---- */}
-      <section className="section--tight">
-        <div className="wrap">
-          <div className="grid gap-6 font-sans sm:grid-cols-3">
-            {[
-              ["Photograph it", "One clear frame from the app. GPS locks at the shutter, written into the photo itself."],
-              ["We route it", "Structural defects go to Austin 311 with a tracked ticket. Vegetation goes to the landowner."],
-              ["Proof closes it", "Nothing is marked fixed without a second photo and a named sign-off."],
-            ].map(([t, b], i) => (
-              <div key={t} className="rounded-[var(--r-lg)] border border-line bg-surface p-5">
-                <p className="font-sans text-[11px] font-semibold tracking-[0.14em] text-olive-600 uppercase">Step {i + 1}</p>
-                <h2 className="mt-2 font-serif text-[1.25rem] font-medium">{t}</h2>
-                <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-soft">{b}</p>
+      {/* ---- Ch. 2: what exists is failing ---- */}
+      <Chapter id="broken" align="end">
+        <Claim>Most of what was built is failing the City's own test.</Claim>
+        <Rise delay={0.1}>
+          <p className="mt-6 font-sans text-[clamp(3.6rem,9vw,6.5rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+            <CountUp value={32} suffix="%" duration={1.5} />
+          </p>
+          <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
+            of the existing network rates functionally acceptable. The rest is cracked, heaved, blocked, or out of
+            slope.
+          </p>
+        </Rise>
+        <Rise delay={0.2} className="mt-8 max-w-xl">
+          <p className="font-sans text-[12px] font-semibold tracking-[0.1em] text-ink-mute uppercase">
+            Austin properties that can reach, on a sidewalk
+          </p>
+          <div className="mt-3 space-y-3 font-sans text-[13px]">
+            {(
+              [
+                ["A school", 51],
+                ["A transit stop", 35],
+                ["A grocery store", 20],
+              ] as const
+            ).map(([label, pct]) => (
+              <div key={label}>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-ink-soft">{label}</span>
+                  <span className="font-semibold text-ink tabular-nums">{pct}%</span>
+                </div>
+                <div className="mt-1.5">
+                  <Bar pct={pct} />
+                </div>
               </div>
             ))}
           </div>
-          <p className="mt-5 font-sans text-[13px] text-ink-soft">
-            <Link to="/how" viewTransition>
-              The full operating model
-            </Link>{" "}
-            ·{" "}
-            <Link to="/data" viewTransition>
-              Every number, downloadable
-            </Link>
-          </p>
-        </div>
-      </section>
+        </Rise>
+        <Source href={PLAN_URL}>City of Austin, Sidewalks, Crossings &amp; Shared Streets Plan (2023)</Source>
+      </Chapter>
 
-      {/* ---- The promise ---- */}
-      <section className="section section--band promise-band has-motif">
-        <Motif kind="lip" opacity={0.14} style={{ color: "var(--olive-800)" }} />
-        <div className="wrap stack stack--lg">
-          <p>No one's grandmother should be injured by a sidewalk a photograph could have fixed.</p>
-          <div className="btn-row" style={{ justifyContent: "center" }}>
-            <Link to="/app" className="btn btn--primary btn--lg" viewTransition>
+      {/* ---- Ch. 3: the math ---- */}
+      <Chapter id="math">
+        <Claim>The City priced the fix. Then it did the math on the money.</Claim>
+        <Rise delay={0.1}>
+          <p className="mt-6 font-sans text-[clamp(3.6rem,9vw,6.5rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+            <CountUp value={90} suffix="+ years" duration={1.5} />
+          </p>
+          <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
+            to finish the network at today's funding. That is the plan's own projection, not a critic's.
+          </p>
+        </Rise>
+        <Rise delay={0.2} className="mt-8 max-w-xl space-y-2 font-sans text-[13px]">
+          <div className="flex items-baseline justify-between gap-4">
+            <span className="text-ink-soft">Building the planned network</span>
+            <span className="font-semibold text-ink tabular-nums">≈ $903M</span>
+          </div>
+          <div className="flex items-baseline justify-between gap-4">
+            <span className="text-ink-soft">Just maintaining the existing 2,800 miles</span>
+            <span className="font-semibold text-ink tabular-nums">≈ $30M every year</span>
+          </div>
+        </Rise>
+        <Source href={PLAN_URL}>City of Austin, Sidewalks, Crossings &amp; Shared Streets Plan (2023)</Source>
+      </Chapter>
+
+      {/* ---- Ch. 4: the human cost ---- */}
+      <Chapter id="falls" align="end">
+        <Claim>The years are not free. They are paid in falls.</Claim>
+        <Rise delay={0.1}>
+          <p className="mt-6 font-sans text-[clamp(3.6rem,9vw,6.5rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+            1 in 4
+          </p>
+          <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
+            adults 65 and older falls each year. Falls send about 3 million older Americans to an emergency room
+            annually.
+          </p>
+        </Rise>
+        <Rise delay={0.2} className="mt-8 max-w-xl">
+          <div className="rounded-[var(--r-md)] bg-olive-600/8 px-4 py-3.5">
+            <p className="font-sans text-[0.95rem] leading-relaxed text-ink">
+              <b className="tabular-nums">73%</b> of outdoor falls are set off by the environment itself, and they
+              happen, in the study's words, "on sidewalks, curbs, and streets."
+            </p>
+          </div>
+        </Rise>
+        <Source href={CDC_URL}>CDC, Older Adult Falls</Source>
+        <Source href={AJPH_URL}>Li et al., American Journal of Public Health (2006)</Source>
+      </Chapter>
+
+      {/* ---- Ch. 5: the precedent ---- */}
+      <Chapter id="precedent">
+        <Claim>Cities that don't count their sidewalks eventually get counted by a court.</Claim>
+        <Rise delay={0.1}>
+          <p className="mt-6 font-sans text-[clamp(3.6rem,9vw,6.5rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+            <CountUp value={1.4} prefix="$" suffix="B" decimals={1} duration={1.5} />
+          </p>
+          <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
+            is what Los Angeles agreed to spend on sidewalk repair over 30 years after residents with mobility
+            disabilities sued under the ADA. It is the largest disability-access settlement in US history.
+          </p>
+        </Rise>
+        <Source href={WILLITS_URL}>Willits v. City of Los Angeles (2015)</Source>
+      </Chapter>
+
+      {/* ---- Ch. 6: the turn ---- */}
+      <Chapter id="count">
+        <Claim>Every number above is an estimate. Not one points to a panel.</Claim>
+        <Rise delay={0.1}>
+          <p className="mt-5 max-w-xl font-sans text-[0.95rem] leading-relaxed text-ink-soft">
+            No agency can name the slab that breaks the next hip, so no crew gets sent to it. That is the missing
+            dataset, and it doesn't take a bond to build. It takes photographs.
+          </p>
+        </Rise>
+        <Rise delay={0.2} className="mt-7 max-w-xl space-y-2.5 font-sans text-[14px]">
+          {(
+            [
+              ["Photograph it", "one clear frame; GPS locks at the shutter."],
+              ["We route it", "structural defects to Austin 311 with a tracked ticket, vegetation to the landowner."],
+              ["Proof closes it", "nothing is marked fixed without a second photo and a named sign-off."],
+            ] as const
+          ).map(([t, b]) => (
+            <p key={t} className="leading-relaxed">
+              <b className="text-ink">{t}:</b> <span className="text-ink-soft">{b}</span>
+            </p>
+          ))}
+        </Rise>
+        <Rise delay={0.3} className="mt-7 max-w-xl">
+          <p className="rounded-[var(--r-md)] bg-field-2 px-3.5 py-2.5 font-sans text-[12px] leading-snug text-ink-soft">
+            Everything above is the City's, the CDC's, and a federal court's. Our numbers start at zero on the map
+            below, and we never round up.
+          </p>
+          <p className="mt-5 font-serif text-[1.05rem] leading-relaxed text-ink-soft italic">
+            Our 80-year-old grandmother broke her finger on a root-lifted panel nobody had reported.
+          </p>
+          <div className="btn-row mt-6">
+            <Link to="/app" className="btn btn--primary" viewTransition>
               Get the app
             </Link>
-            <Link to="/map" className="btn btn--lg" viewTransition>
-              See the live map
+            <Link to="/how" className="btn" viewTransition>
+              How it works
             </Link>
           </div>
-        </div>
-      </section>
+        </Rise>
+      </Chapter>
+
+      {/* ---- Finale: the scroll becomes the map ---- */}
+      <MapFinale mapUrl={mapUrl} live={live} />
     </>
+  );
+}
+
+/* ================= building blocks ================= */
+
+function Chapter({ id, align = "start", children }: { id: string; align?: "start" | "end"; children: ReactNode }) {
+  return (
+    <section id={id} className="grid min-h-[88vh] content-center py-16">
+      <div className="wrap">
+        <div className={`max-w-2xl lg:max-w-3xl ${align === "end" ? "lg:ml-auto" : ""}`}>{children}</div>
+      </div>
+    </section>
+  );
+}
+
+function Claim({ children }: { children: ReactNode }) {
+  return (
+    <Rise>
+      <h2 className="max-w-2xl font-serif text-[clamp(1.8rem,3.8vw,2.5rem)] leading-[1.08] font-medium tracking-[-0.02em] text-balance">
+        {children}
+      </h2>
+    </Rise>
+  );
+}
+
+function Rise({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
+  const reduced = useReducedMotion();
+  return (
+    <motion.div
+      className={className}
+      initial={reduced ? false : { opacity: 0, y: 26 }}
+      whileInView={reduced ? undefined : { opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.3, margin: "0px 0px -8% 0px" }}
+      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function Bar({ pct }: { pct: number }) {
+  const reduced = useReducedMotion();
+  return (
+    <div className="h-2 w-full overflow-hidden rounded-full bg-olive-600/12">
+      <motion.div
+        className="h-full rounded-full bg-olive-600"
+        initial={reduced ? { width: `${pct}%` } : { width: "0%" }}
+        whileInView={{ width: `${pct}%` }}
+        viewport={{ once: true, amount: 0.9 }}
+        transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+      />
+    </div>
+  );
+}
+
+function Source({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <p className="mt-4 font-sans text-[11.5px] text-ink-mute first-of-type:mt-6">
+      Source:{" "}
+      <a href={href} rel="noopener" target="_blank" className="underline decoration-line underline-offset-2 hover:text-ink-soft">
+        {children}
+      </a>
+    </p>
+  );
+}
+
+/** Right-edge dot rail, the narrated-report signature. Desktop only. */
+function ChapterRail() {
+  const reduced = useReducedMotion();
+  const [active, setActive] = useState<string | null>(null);
+  useEffect(() => {
+    const ids = ["prologue", ...CHAPTERS.map((c) => c.id), "finale"];
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) if (e.isIntersecting) setActive(e.target.id);
+      },
+      { rootMargin: "-45% 0px -45% 0px" },
+    );
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) obs.observe(el);
+    }
+    return () => obs.disconnect();
+  }, []);
+  const visible = active !== null && active !== "prologue" && active !== "finale";
+  return (
+    <nav
+      aria-label="Story chapters"
+      className={`fixed top-1/2 right-5 z-10 hidden -translate-y-1/2 flex-col items-end gap-3 transition-opacity duration-500 xl:flex ${
+        visible ? "opacity-100" : "pointer-events-none opacity-0"
+      }`}
+    >
+      {CHAPTERS.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          onClick={() => document.getElementById(c.id)?.scrollIntoView({ behavior: reduced ? "auto" : "smooth" })}
+          className="group flex items-center gap-2.5"
+          aria-label={c.label}
+          aria-current={active === c.id ? "true" : undefined}
+        >
+          <span className="font-sans text-[11px] text-ink-mute opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+            {c.label}
+          </span>
+          <span
+            className={`rounded-full transition-all duration-300 ${
+              active === c.id ? "h-5 w-1.5 bg-olive-700" : "h-1.5 w-1.5 bg-olive-600/35 group-hover:bg-olive-600/70"
+            }`}
+          />
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function MapFinale({ mapUrl, live }: { mapUrl: string | null; live: { total: number; open: number; fixed: number } }) {
+  const reduced = useReducedMotion();
+  const ref = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end end"] });
+  const scale = useTransform(scrollYProgress, [0, 0.55], [0.86, 1]);
+  const radius = useTransform(scrollYProgress, [0, 0.55], ["1.5rem", "0rem"]);
+  const [engaged, setEngaged] = useState(false);
+  useMotionValueEvent(scrollYProgress, "change", (v) => setEngaged(v > 0.58));
+
+  return (
+    <section ref={ref} id="finale" className="relative h-[230vh] bg-field">
+      <div className="sticky top-0 h-dvh overflow-hidden">
+        <motion.div
+          className="absolute inset-0 overflow-hidden bg-field-2"
+          style={reduced ? undefined : { scale, borderRadius: radius }}
+        >
+          <Link to="/map" viewTransition className="group block h-full w-full" aria-label="Open the live map">
+            {mapUrl ? (
+              <img
+                src={mapUrl}
+                alt="Map of Northwest Austin sidewalk hazards"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 grid place-items-center font-sans text-[13px] text-ink-mute">
+                The map is loading.
+              </div>
+            )}
+            <span className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-olive-900/55 to-transparent" aria-hidden />
+          </Link>
+        </motion.div>
+
+        <motion.div
+          className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-9"
+          initial={reduced ? false : { opacity: 0, y: 24 }}
+          animate={reduced ? undefined : engaged ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+          transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="pointer-events-auto max-w-md rounded-[var(--r-lg)] bg-olive-900/92 p-5 text-ink-on-dark shadow-xl sm:p-6">
+            <p className="flex items-center gap-2 font-sans text-[11px] font-semibold tracking-[0.14em] text-ink-on-dark-soft uppercase">
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-olive-400 opacity-60 motion-reduce:hidden" />
+                <span className="relative inline-flex size-2 rounded-full bg-olive-300" />
+              </span>
+              Our count · live
+            </p>
+            <p className="mt-2.5 font-serif text-[1.55rem] leading-tight font-medium">The count starts at zero.</p>
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 font-sans text-[13px] text-ink-on-dark-soft">
+              <span>
+                <b className="text-ink-on-dark tabular-nums">{fmtInt(live.total)}</b> on file
+              </span>
+              <span>
+                <b className="text-ink-on-dark tabular-nums">{fmtInt(live.open)}</b> open
+              </span>
+              <span>
+                <b className="text-ink-on-dark tabular-nums">{fmtInt(live.fixed)}</b> verified fixed
+              </span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2.5">
+              <Link to="/map" className="btn btn--dark btn--sm" viewTransition>
+                Open the live map →
+              </Link>
+              <Link to="/app" className="btn btn--ghost-dark btn--sm" viewTransition>
+                Get the app
+              </Link>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </section>
   );
 }

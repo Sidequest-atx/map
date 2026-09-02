@@ -11,12 +11,14 @@ export function CountUp({
   duration = 1.3,
   prefix = "",
   suffix = "",
+  decimals = 0,
 }: {
   value: number;
   className?: string;
   duration?: number;
   prefix?: string;
   suffix?: string;
+  decimals?: number;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, margin: "-10% 0px" });
@@ -32,7 +34,7 @@ export function CountUp({
     const controls = animate(0, value, {
       duration,
       ease: [0.16, 1, 0.3, 1],
-      onUpdate: (v) => setN(Math.round(v)),
+      onUpdate: (v) => setN(v),
     });
     return () => controls.stop();
   }, [inView, value, reduced, duration]);
@@ -40,7 +42,7 @@ export function CountUp({
   return (
     <span ref={ref} className={className}>
       {prefix}
-      {n.toLocaleString("en-US")}
+      {n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
       {suffix}
     </span>
   );

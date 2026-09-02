@@ -99,19 +99,21 @@ src/types.ts           domain types (mirrors ../src/types.ts; adds fix metadata 
 src/theme.ts           tokens (hex approximations of ../src/styles/tokens.css)
 src/ui/                Button, Card, Badge, Notice, OptionGrid, Segmented, KPI …
 src/components/        Maps (PinPicker, ReportsMap, TrailMap), GpsHud
-src/data/              fs (documents layout), store (ledger + rules), session + prefs, places
+src/data/              fs (documents layout), store (ledger + rules), sync (push/pull to Supabase), session (Supabase auth) + prefs, places
 src/lib/               location (live GPS + snapshot at shutter, reverse geocode), photos (resize → EXIF → album), exif (piexif GPS writer/reader), geo, format, export
 src/ai/                classify (endpoint hook), dedup, rank (same math as the site)
 src/glasses/           trail (background task, JSONL breadcrumbs), match (photos → trail by time)
-src/screens/           SignIn, Home, ReportFlow, Drive, GlassesWalk, ReportsList, ReportDetail, Settings
+src/screens/           SignIn, Home, MapScreen (shared map, mapbox-gl in a WebView), ReportFlow, Drive, GlassesWalk, ReportsList, ReportDetail, Settings
 scripts/make_icons.py  app icon / splash / adaptive icons from the brand mark
 ```
 
-On-device files (`Paths.document/sidequest/`): `reports.json`, `drives.json`, `walks.json`, `session.json`, `prefs.json`, `walk-active.json`, `walk-trail.jsonl`, `drive-queue.json`, `photos/<id>.jpg` (+ `<id>.t.jpg` thumbs).
+On-device files (`Paths.document/sidequest/`): `reports.json`, `drives.json`, `walks.json`, `session.json`, `prefs.json`, `sync-removed.json`, `sync-drives.json`, `walk-active.json`, `walk-trail.jsonl`, `drive-queue.json`, `photos/<id>.jpg` (+ `<id>.t.jpg` thumbs).
+
+## Sync
+
+Local-first: every capture lands in the ledger instantly, then `src/data/sync.ts` pushes it to `sq_reports` + the `sidequest-photos` bucket (idempotent on `client_id`, so retries never duplicate). The server assigns the shared `SQ-NNNN` ref, which replaces the phone's `SQ-P` ref; moderation done elsewhere is pulled back on foreground. Deleting a synced report tombstones it and deletes the shared row too. Signed-out or offline, everything simply queues — the Settings screen shows what is waiting.
 
 ## Next
-
-- Supabase: `supabase/schema.sql` already accepts `source = 'glasses'`; a `SupabaseStore` behind `ReportStore` + photo upload to the `hazard-photos` bucket is the sync path. Until then, GeoJSON export + the Photos album are the hand-off.
 - Ray-Ban **Display** HUD (Cascade's `/glasses` pattern, 600×600 web app added via Meta AI → Developer Mode): needs the site hosted with a small read API; the app's trail + reports would feed "nearby unreported stretch" prompts.
 - Meta Wearables Device Access Toolkit (live glasses camera into the app): native SDK, needs a Mac + Meta developer registration; the time-match import above covers the use case without it.
 - Vision model behind `EXPO_PUBLIC_AI_ENDPOINT`.

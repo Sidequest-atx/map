@@ -16,30 +16,33 @@ Our 80-year-old grandmother tripped on a root-lifted panel on a walk she had tak
 
 ## What this repo is
 
-A React + TypeScript + Vite single-page app with two faces:
+A React + TypeScript + Vite website, a native iPhone app (`mobile/`), and a shared Supabase backend (`supabase/schema.sql`). **Photos are captured only in the iPhone app**; the website is the living public map and the moderation desk.
 
 | Surface | Route | Who | Job |
 | --- | --- | --- | --- |
-| Public site | `/` `/map` `/how` `/data` | anyone | Mission, live Mapbox map with filters and deep links, operating model, open data with CSV/GeoJSON downloads. **View only.** |
-| App (PWA) | `/app` `/app/report` `/app/drive` | signed-in reporters and drive captains | The only surface that takes and uploads photos. Phone-first, rear camera. |
-| Portal | `/portal` | moderators | KPIs, priority-ranked table, 311 ticket routing, duplicate merge, after-photo verification, exports. |
+| Public site | `/` `/map` `/how` `/data` `/app` | anyone | Mission, live Mapbox map with filters and deep links, operating model, open data with CSV/GeoJSON downloads, how to get the app. **View only.** |
+| Portal | `/portal` (sign-in at `/app/signin`) | moderators | KPIs, priority-ranked table, 311 ticket routing, duplicate merge, after-photo verification, exports. |
+| iPhone app | `mobile/` | signed-in reporters | The only surface that takes photos. Camera + GPS-at-shutter, Quest Drive, Glasses Walk, and a Map tab showing the same shared map. |
 
 ### The AI is structural, not a chatbot
 
 | Module | What it does today | How it grows |
 | --- | --- | --- |
-| `src/ai/classify.ts` | On-device heuristic over real pixel statistics proposes type + severity + top-2 alternatives + a reason. Suggestion only; reporter confirms. | Set `VITE_AI_ENDPOINT` to any vision backend; model name is recorded on every report so the dataset can be re-scored as models improve. |
+| `supabase/functions/sq-classify` | **Claude** (`claude-haiku-4-5`) rates every photo's type + severity against published sidewalk-condition criteria — PROWAG displacement tiers, FHWA LTPP crack classes, UW Project Sidewalk passability (sources in `RUBRIC.md`). Signed-in callers only, actual token cost metered into `sq_ai_usage`, hard monthly budget stop. Suggestion only; reporter confirms. | Tune the rubric and redeploy; swap `ai_model` in `sq_config` (e.g. `claude-sonnet-5`) without a client build. The model name is recorded on every report so the dataset can be re-scored as models improve. |
+| `src/ai/classify.ts` (web, demo mode) | The original on-device pixel-statistics heuristic, kept for `VITE_DEMO=1`. | — |
 | `src/ai/dedup.ts` | Distance + type match (15 m) on submit and within Quest Drive batches. Reporter decides "add to SQ-0142" vs new pin. | Visual similarity via the same endpoint. |
 | `src/ai/rank.ts` | Transparent 0–100 priority: trip risk × who walks here (schools, transit, senior housing) × time waiting. Every factor shown. | Ingest the city's own prioritization inputs. |
-| `src/ai/verify.ts` | Resolution requires an after-photo; the model checks the hazard is gone; a named moderator signs. | Before/after pair model. |
-
-### Quest Drives
-
-One person drives, one captures from the passenger seat. `/app/drive` opens the rear camera, captures a frame every 5 or 10 seconds (or on tap) with a GPS breadcrumb trail, then batch-classifies, deduplicates, and presents a review list before anything reaches the map. A simulated drive (procedural frames along Anderson Mill Rd) runs on desktops or when the camera is denied. The queue is persisted locally so an interrupted drive can be resumed.
+| `src/ai/verify.ts` | Resolution requires an after-photo; Claude compares before/after and says whether the hazard is gone; a named moderator signs. | — |
 
 ### Phone app (`mobile/`)
 
-The PWA cannot lock a GPS fix to the shutter, write coordinates into the photo, or record a trail with the screen off. `mobile/` is the native iPhone app that can (Expo SDK 57, shipped through EAS to TestFlight). Same types, same dedup and ranking math, same rules (no after-photo, no "resolved"). Three capture modes: **Report** (GPS locked at the shutter, EXIF-tagged JPEG, draggable pin with the accuracy ring, saved to a "SideQuest ATX" Photos album), **Quest Drive**, and **Glasses Walk**, where Meta glasses (or any camera without GPS) take the pictures and the phone in your pocket records the trail they get placed on. Local-first; exports GeoJSON/CSV. See `mobile/README.md` for the build and TestFlight checklist.
+A web page cannot lock a GPS fix to the shutter, write coordinates into the photo, or record a trail with the screen off. `mobile/` is the native iPhone app that can (Expo SDK 57, unsigned IPA from GitHub Actions + Sideloadly). Same types, same dedup and ranking math, same rules (no after-photo, no "resolved"). Three capture modes: **Report** (GPS locked at the shutter, EXIF-tagged JPEG, draggable pin with the accuracy ring, saved to a "SideQuest ATX" Photos album), **Quest Drive** (interval capture from the passenger seat with a breadcrumb trail and batch review), and **Glasses Walk**, where Meta glasses (or any camera without GPS) take the pictures and the phone in your pocket records the trail they get placed on. Local-first ledger, synced to Supabase whenever there is a connection; a **Map** tab shows the shared map (mapbox-gl in a WebView, same palette as the site). See `mobile/README.md`.
+
+### Backend (`supabase/`)
+
+One shared Supabase project (namespaced `sq_*` — see the header of `supabase/schema.sql` for why). Email + password accounts; everyone signs up as a reporter, the moderator role is a server-side JWT claim. RLS: the map is publicly readable, reporters insert their own rows, owners and moderators update. Photos land in the public `sidequest-photos` bucket under the uploader's folder. The website subscribes to realtime changes, so a photo taken on a walk appears on `/map` while the reporter is still standing next to the hazard.
+
+**Bootstrap** (once, ~90 seconds): open the project's SQL editor, paste `supabase/schema.sql`, add the Mapbox token line at the bottom, Run. Then Authentication → Sign In / Providers → turn **off** "Confirm email" so accounts work instantly.
 
 ## Run it
 
@@ -54,15 +57,15 @@ To test the camera on a phone over LAN you need HTTPS: `npm run dev -- --host` p
 ## Architecture notes
 
 - **Design system**: hand-rolled, `src/styles/tokens.css` + `global.css`. Committed olive on a tinted beige field, Literata for the public site, system UI font for the app and portal. Motion is transform/opacity only, gated by `prefers-reduced-motion`; the mobile map sheet is a real drag sheet with velocity projection and a critically damped spring.
-- **Storage**: `src/data/store.ts` is a `ReportStore` interface. Today: localStorage seeded with ~60 synthetic NW Austin reports (badged "Demo data" until a real report exists). Next: Supabase, schema in `supabase/schema.sql`, which enforces the same rules (a `resolved` row needs an after-photo) at the database.
-- **Auth**: `src/data/session.ts` is a mock session with roles `reporter | drive-captain | moderator`. Shape mirrors the Supabase RLS split so swapping in real auth touches one file.
+- **Storage**: `src/data/store.ts` is a `ReportStore` interface with two implementations: `SupabaseStore` (`src/data/remote.ts`, the default — live rows, realtime, optimistic moderation writes) and the original localStorage prototype seeded with ~60 synthetic NW Austin reports, kept behind `VITE_DEMO=1`. The database re-enforces the store's rules (a `resolved` row needs an after-photo).
+- **Auth**: `src/data/session.ts` wraps Supabase email + password auth; pages still see the mock era's `{ name, role, since }`. Moderator comes from the JWT claim `app_metadata.sq_role`, granted server-side.
 - **No dead ends**: error boundaries per layout, 404 route, role gate that explains and offers a way out, camera/geolocation/Mapbox fallbacks, browser-Back-aware report steps, leave-guard on drives, list view when tiles fail.
 - **PWA**: manifest with `start_url: /app`, icons generated by `scripts/make_icons.py`, offline shell in `public/sw.js` (production only).
 
 ## Roadmap
 
 - [x] Native iPhone capture app with GPS-at-shutter, EXIF-tagged photos, and Glasses Walk (`mobile/`)
-- [ ] Supabase backend + real accounts (schema ready; phone exports merge into it)
+- [x] Supabase backend + real accounts (photos app-only; site and app share one live map)
 - [ ] Fine-tuned sidewalk vision model behind `VITE_AI_ENDPOINT` / `EXPO_PUBLIC_AI_ENDPOINT`
 - [ ] Austin 311 API hand-off instead of manual ticket entry
 - [ ] Printable door-hanger per vegetation report (sample on `/how`)

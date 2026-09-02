@@ -10,11 +10,12 @@ A civic product that photographs every broken, blocked, or missing sidewalk in A
 - Moderators routing tickets and verifying close-outs
 
 ## Register
-- Public site (`/`, `/map`, `/how`, `/data`): brand. Design IS the product; it has to earn trust and outreach.
-- App (`/app/*`) and portal (`/portal`): product. Earned familiarity, density, state-driven motion only.
+- Public site (`/`, `/map`, `/how`, `/data`, `/app`): brand. Design IS the product; it has to earn trust and outreach.
+- Portal (`/portal`) and sign-in: product. Earned familiarity, density, state-driven motion only.
+- iPhone app (`mobile/`): product. The only photo surface; local-first, synced to the shared Supabase map.
 
 ## Platform
-web (PWA for the app surface)
+web (public site + moderator portal) + native iOS (Expo, `mobile/`)
 
 ## Voice
 Plain, specific, civic. No sob framing, no invented numbers, targets stated as targets. The promise line is the only sentence allowed to be lyrical.

@@ -1,3 +1,4 @@
+import { DEMO, supabase, SUPABASE_URL } from "../lib/supabase";
 import type { HazardReport } from "../types";
 import { classifyHazardPhoto } from "./classify";
 
@@ -6,8 +7,11 @@ import { classifyHazardPhoto } from "./classify";
  *
  * A 311 ticket marked "closed" is not the same as a fixed sidewalk. Before a
  * report becomes "resolved" we require an after-photo and ask the model
- * whether the original hazard is still visible. The answer is advisory: a
- * moderator makes the final call and their name goes on the record.
+ * whether the original hazard is still visible. The default model is Claude
+ * behind the sq-classify edge function (before/after pair when the original
+ * photo is on file); VITE_AI_ENDPOINT overrides it, and demo mode keeps the
+ * old pixel-statistics heuristic. The answer is advisory: a moderator makes
+ * the final call and their name goes on the record.
  */
 export interface VerificationResult {
   /** true when the after-photo no longer reads as the original hazard */
@@ -18,11 +22,14 @@ export interface VerificationResult {
 }
 
 export async function verifyRepair(report: HazardReport, afterPhoto: string): Promise<VerificationResult> {
-  const endpoint = import.meta.env.VITE_AI_ENDPOINT;
+  const endpoint = import.meta.env.VITE_AI_ENDPOINT || (DEMO ? undefined : `${SUPABASE_URL}/functions/v1/sq-classify`);
   if (endpoint) {
+    const { data } = await supabase().auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error("Sign in to run verification.");
     const res = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ op: "verify", before: report.photo ?? null, after: afterPhoto, type: report.type }),
     });
     if (!res.ok) throw new Error(`Verifier responded ${res.status}`);

@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+﻿import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { motion, useMotionValueEvent, useReducedMotion, useScroll } from "motion/react";
 import { CountUp } from "../components/CountUp";
 import DiveMap from "../components/DiveMap";
 import { FallTicker } from "../components/FallTicker";
 import { Motif } from "../components/Motif";
-import { SidewalkSpine } from "../components/SidewalkSpine";
+import { SidewalkWalk } from "../components/SidewalkWalk";
 import { useReports } from "../data/store";
 import { fmtInt } from "../lib/format";
 import { staticMapUrl, useMapboxToken } from "../lib/mapbox";
@@ -62,7 +62,10 @@ export default function Mission() {
 
   const active = useActiveSection(["prologue", ...CHAPTERS.map((c) => c.id), "finale"]);
   const chapterIndex = CHAPTERS.findIndex((c) => c.id === active);
-  const stage = active === "finale" ? 5 : Math.max(chapterIndex, 0);
+
+  // The walk: one scroll progress across the whole story drives the canvas.
+  const storyRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress: walkProgress } = useScroll({ target: storyRef, offset: ["start 0.65", "end 0.92"] });
 
   // Mount the live dive map a beat before the reader reaches it.
   const [mapArmed, setMapArmed] = useState(false);
@@ -99,15 +102,17 @@ export default function Mission() {
             SideQuest ATX · Northwest Austin
           </p>
           <h1 className="mt-4 max-w-3xl font-serif text-[clamp(2.3rem,5.2vw,3.8rem)] leading-[1.06] font-medium tracking-[-0.02em] text-balance">
-            How many of Austin's sidewalks could put someone on the ground?
+            Austin knows its sidewalks by the mile. Nobody knows them by the panel.
           </h1>
           <Rise delay={0.6}>
-            <p className="mt-6 font-serif text-[clamp(1.5rem,3vw,2.1rem)] italic">Nobody knows.</p>
+            <p className="mt-6 font-serif text-[clamp(1.4rem,2.6vw,2rem)] italic">
+              And everything that matters happens on a panel.
+            </p>
           </Rise>
           <Rise delay={1.1}>
             <p className="mt-5 max-w-xl font-sans text-[0.95rem] leading-relaxed text-ink-on-dark-soft">
-              The City measures its network in miles. No one counts it panel by panel. Here is what the miles already
-              say, and where the counting starts.
+              The City can price the entire fix and still can't name the slab that breaks the next hip. This page is
+              one walk down that gap. Every number on it is the City's, the CDC's, or a federal court's.
             </p>
           </Rise>
         </div>
@@ -121,13 +126,19 @@ export default function Mission() {
         </div>
       </section>
 
-      {/* ---- The story: text left, the degrading sidewalk right ---- */}
-      <div className="wrap lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,33rem)] lg:gap-14">
-        <div>
+      {/* ---- The story, in the portal's frame: the walk fills the screen,
+              the narrative takes its panel. ---- */}
+      <div ref={storyRef} className="relative lg:flex">
+        <div className="sticky top-[var(--topbar-h)] z-10 h-[34dvh] min-w-0 border-b border-line lg:static lg:z-auto lg:h-auto lg:flex-1 lg:border-b-0">
+          <div className="h-full lg:sticky lg:top-[var(--topbar-h)] lg:h-[calc(100dvh-var(--topbar-h))]">
+            <SidewalkWalk progress={walkProgress} />
+          </div>
+        </div>
+        <div className="border-line bg-surface px-5 sm:px-8 lg:w-[38%] lg:shrink-0 lg:border-l lg:px-10">
           <Chapter id="missing">
-            <Claim>The first problem isn't broken sidewalk. It's sidewalk that was never built.</Claim>
+            <Claim>Austin doesn't have a sidewalk network. It has 2,800 miles of fragments.</Claim>
             <Rise delay={0.1}>
-              <p className="mt-6 font-sans text-[clamp(3.4rem,8vw,6rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
                 <CountUp value={1500} suffix=" mi" duration={1.8} />
               </p>
               <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
@@ -143,19 +154,18 @@ export default function Mission() {
                 <Bar pct={58} />
               </div>
             </Rise>
-            <SidewalkSpine stage={0} className="mt-8 w-full max-w-md lg:hidden" />
             <Source href={PLAN_URL}>City of Austin, Sidewalks, Crossings &amp; Shared Streets Plan (2023)</Source>
           </Chapter>
 
           <Chapter id="broken">
             <Claim>Most of what was built is failing the City's own test.</Claim>
             <Rise delay={0.1}>
-              <p className="mt-6 font-sans text-[clamp(3.4rem,8vw,6rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
                 <CountUp value={32} suffix="%" duration={1.5} />
               </p>
               <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
-                of the existing network rates functionally acceptable. The rest is cracked, heaved, blocked, or out of
-                slope.
+                of the existing network rates functionally acceptable. And that's an average: no list names the panels
+                that make up the other 68%.
               </p>
             </Rise>
             <Rise delay={0.2} className="mt-8 max-w-xl">
@@ -182,14 +192,13 @@ export default function Mission() {
                 ))}
               </div>
             </Rise>
-            <SidewalkSpine stage={1} className="mt-8 w-full max-w-md lg:hidden" />
             <Source href={PLAN_URL}>City of Austin, Sidewalks, Crossings &amp; Shared Streets Plan (2023)</Source>
           </Chapter>
 
           <Chapter id="math">
             <Claim>The City priced the fix. Then it did the math on the money.</Claim>
             <Rise delay={0.1}>
-              <p className="mt-6 font-sans text-[clamp(3.4rem,8vw,6rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
                 <CountUp value={90} suffix="+ years" duration={1.5} />
               </p>
               <p
@@ -211,7 +220,7 @@ export default function Mission() {
               </div>
               <div
                 className="flex items-baseline justify-between gap-4"
-                title="Derived: $80B ÷ 365 ≈ $219M/day; $903M ÷ $219M ≈ 4.1 days."
+                title="Derived: $80B / 365 ≈ $219M per day; $903M / $219M ≈ 4.1 days."
               >
                 <span className="text-ink-soft">What the US spends on fall injuries, every 4 days</span>
                 <span className="font-semibold text-ink tabular-nums">≈ $903M</span>
@@ -236,7 +245,7 @@ export default function Mission() {
               </p>
             </Rise>
             <Rise delay={0.15}>
-              <p className="mt-6 font-sans text-[clamp(3.4rem,8vw,6rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
                 1 in 4
               </p>
               <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
@@ -248,23 +257,22 @@ export default function Mission() {
             </Rise>
             <Rise delay={0.25} className="mt-4 max-w-xl">
               <p className="font-sans text-[0.95rem] leading-relaxed text-ink">
-                In 2023, falls killed <b className="tabular-nums">41,000+</b> Americans over 65 — more than car crashes
+                In 2023, falls killed <b className="tabular-nums">41,000+</b> Americans over 65: more than car crashes
                 killed Americans <i>of every age</i> (<span className="tabular-nums">40,901</span>).
               </p>
             </Rise>
             <Rise delay={0.3} className="mt-4 max-w-xl">
               <div className="rounded-[var(--r-md)] bg-olive-600/8 px-4 py-3.5">
                 <p className="font-sans text-[0.95rem] leading-relaxed text-ink">
-                  <b className="tabular-nums">73%</b> of outdoor falls are set off by the environment itself — "on
+                  <b className="tabular-nums">73%</b> of outdoor falls are set off by the environment itself: "on
                   sidewalks, curbs, and streets."
                 </p>
               </div>
               <p className="mt-3 font-sans text-[13px] leading-relaxed text-ink-soft">
-                Cyclists too: in study after study, 60–95% of riders treated in emergency rooms crashed with no car
+                Cyclists too: in study after study, 60 to 95% of riders treated in emergency rooms crashed with no car
                 involved, and surface hazards are a leading factor.
               </p>
             </Rise>
-            <SidewalkSpine stage={3} className="mt-8 w-full max-w-md lg:hidden" />
             <Source href={CDC_URL}>CDC, Older Adult Falls</Source>
             <Source href={NCHS_URL}>Fall deaths: CDC/NCHS Data Brief 532 (2023)</Source>
             <Source href={NHTSA_URL}>Traffic deaths: NHTSA (2023)</Source>
@@ -275,7 +283,7 @@ export default function Mission() {
           <Chapter id="precedent">
             <Claim>Cities that don't count their sidewalks eventually get counted by a court.</Claim>
             <Rise delay={0.1}>
-              <p className="mt-6 font-sans text-[clamp(3.4rem,8vw,6rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
+              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-bold tracking-tight text-olive-800 tabular-nums">
                 <CountUp value={1.4} prefix="$" suffix="B" decimals={1} duration={1.5} />
               </p>
               <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
@@ -330,13 +338,6 @@ export default function Mission() {
             </Rise>
           </Chapter>
         </div>
-
-        {/* the sidewalk, degrading beside the story */}
-        <div className="hidden lg:block">
-          <div className="sticky top-[var(--topbar-h)] flex h-[calc(100dvh-var(--topbar-h))] items-center">
-            <SidewalkSpine stage={stage} className="w-full" />
-          </div>
-        </div>
       </div>
 
       {/* ---- Finale: the scroll dives into the map ---- */}
@@ -358,7 +359,7 @@ function Chapter({ id, children }: { id: string; children: ReactNode }) {
 function Claim({ children }: { children: ReactNode }) {
   return (
     <Rise>
-      <h2 className="max-w-2xl font-serif text-[clamp(1.8rem,3.8vw,2.5rem)] leading-[1.08] font-medium tracking-[-0.02em] text-balance">
+      <h2 className="max-w-2xl font-serif text-[clamp(1.6rem,1vw+1.05rem,2.05rem)] leading-[1.08] font-medium tracking-[-0.02em] text-balance">
         {children}
       </h2>
     </Rise>

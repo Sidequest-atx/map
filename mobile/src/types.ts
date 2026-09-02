@@ -76,6 +76,12 @@ export interface HazardReport {
   verified?: boolean;
   duplicateOf?: string;
   rank?: number;
+  /** Server row id (uuid) once this report reached the shared map */
+  remoteId?: string;
+  /** ISO time of the last successful push of this row */
+  syncedAt?: string;
+  /** Field names changed locally since the last push (drives what re-syncs, so a phone push can never clobber columns it did not touch) */
+  dirtyFields?: string[];
   /** When the photo was taken (ISO) */
   createdAt: string;
   updatedAt: string;

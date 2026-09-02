@@ -25,13 +25,34 @@ export interface ReportStore {
     meta?: { ticket311?: string; afterPhotoUri?: string; by?: string; verified?: boolean },
   ): { ok: true } | { ok: false; reason: string };
   remove(id: string): void;
+  /** Write sync bookkeeping without touching updatedAt or dirtyFields (so a push never re-dirties the row). */
+  applySync(id: string, patch: Partial<HazardReport>): void;
+  tombstones(): Tombstone[];
+  clearTombstone(clientId: string): void;
   subscribe(listener: () => void): () => void;
+}
+
+/** A report the reporter deleted locally; the sync engine deletes it from the shared map too. */
+export interface Tombstone {
+  /** Server uuid when the delete happened after a successful push */
+  remoteId?: string;
+  clientId: string;
+}
+
+/** Local bookkeeping and media fields that never sync by themselves. */
+const SYNC_IRRELEVANT = new Set<string>(["photoUri", "thumbUri", "photoAssetId", "remoteId", "syncedAt", "dirtyFields", "rank", "updatedAt", "fix", "id", "ref", "walkId", "driveId", "createdAt", "source"]);
+
+function markDirty(r: HazardReport, fields: string[]): string[] | undefined {
+  const next = new Set(r.dirtyFields ?? []);
+  for (const f of fields) if (!SYNC_IRRELEVANT.has(f)) next.add(f);
+  return next.size ? [...next] : r.dirtyFields;
 }
 
 class LedgerStore implements ReportStore {
   private reportsDoc = new JsonDoc<HazardReport[]>("reports.json", () => []);
   private drivesDoc = new JsonDoc<DriveSession[]>("drives.json", () => []);
   private walksDoc = new JsonDoc<WalkSession[]>("walks.json", () => []);
+  private tombstonesDoc = new JsonDoc<Tombstone[]>("sync-removed.json", () => []);
   private reports: HazardReport[];
   private driveSessions: DriveSession[];
   private walkSessions: WalkSession[];
@@ -113,7 +134,13 @@ class LedgerStore implements ReportStore {
   update(id: string, patch: Partial<HazardReport>) {
     const i = this.reports.findIndex((x) => x.id === id);
     if (i < 0) return;
-    this.reports[i] = { ...this.reports[i], ...patch, updatedAt: new Date().toISOString() };
+    const prev = this.reports[i];
+    this.reports[i] = {
+      ...prev,
+      ...patch,
+      updatedAt: new Date().toISOString(),
+      dirtyFields: markDirty(prev, Object.keys(patch)),
+    };
     this.persist();
   }
 
@@ -126,9 +153,14 @@ class LedgerStore implements ReportStore {
     }
     const now = new Date().toISOString();
     const r: HazardReport = { ...prev, status, updatedAt: now };
-    if (meta.ticket311) r.ticket311 = meta.ticket311;
+    const touched = ["status", "resolvedAt", "resolvedBy", "verified"];
+    if (meta.ticket311) {
+      r.ticket311 = meta.ticket311;
+      touched.push("ticket311");
+    }
     if (status === "resolved") {
       r.afterPhotoUri = meta.afterPhotoUri ?? prev.afterPhotoUri;
+      touched.push("afterPhotoUri");
       r.resolvedAt = now;
       r.resolvedBy = meta.by ?? prev.resolvedBy ?? "moderator";
       r.verified = meta.verified ?? prev.verified ?? false;
@@ -136,6 +168,7 @@ class LedgerStore implements ReportStore {
       r.resolvedAt = undefined;
       r.verified = false;
     }
+    r.dirtyFields = markDirty(prev, touched);
     this.reports[i] = r;
     this.persist();
     return { ok: true as const };
@@ -145,6 +178,10 @@ class LedgerStore implements ReportStore {
     const idx = this.reports.findIndex((x) => x.id === id);
     if (idx < 0) return;
     const [r] = this.reports.splice(idx, 1);
+    // Always tombstone: a delete during the first in-flight upload would
+    // otherwise leave a ghost row on the shared map (the sync engine deletes
+    // by client_id, a no-op if the row never landed).
+    this.tombstonesDoc.write([...this.tombstonesDoc.read(), { remoteId: r.remoteId, clientId: r.id }]);
     deleteIfExists(r.photoUri);
     deleteIfExists(r.thumbUri);
     deleteIfExists(r.afterPhotoUri);
@@ -152,6 +189,22 @@ class LedgerStore implements ReportStore {
       if (this.reports[i].duplicateOf === r.id) this.reports[i] = { ...this.reports[i], duplicateOf: undefined };
     }
     this.persist();
+  }
+
+  applySync(id: string, patch: Partial<HazardReport>) {
+    const i = this.reports.findIndex((x) => x.id === id);
+    if (i < 0) return;
+    this.reports[i] = { ...this.reports[i], ...patch };
+    this.persist();
+  }
+
+  /** Pending remote deletions (consumed by the sync engine on success). */
+  tombstones(): Tombstone[] {
+    return this.tombstonesDoc.read();
+  }
+
+  clearTombstone(clientId: string) {
+    this.tombstonesDoc.write(this.tombstonesDoc.read().filter((t) => t.clientId !== clientId));
   }
 
   subscribe(listener: () => void): () => void {

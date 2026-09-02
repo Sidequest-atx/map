@@ -6,17 +6,20 @@ import { classifierName } from "../ai/classify";
 import { photosDirStats } from "../data/fs";
 import { setPrefs, signOut, usePrefs, useSession } from "../data/session";
 import { useReports } from "../data/store";
+import { syncNow, useSyncStatus } from "../data/sync";
 import { shareCsv, shareGeoJSON } from "../lib/export";
 import { ALBUM_NAME } from "../lib/photos";
 import type { ScreenProps } from "../nav";
+import { shortDateTime } from "../lib/format";
 import { C, SP } from "../theme";
 import { ROLE_LABELS } from "../types";
-import { Button, Card, Divider, H2, P, Row, Screen, Segmented, Small, Stack } from "../ui";
+import { Button, Card, Divider, H2, Notice, P, Row, Screen, Segmented, Small, Stack } from "../ui";
 
 export function SettingsScreen(_: ScreenProps<"Settings">) {
   const session = useSession();
   const prefs = usePrefs();
   const reports = useReports();
+  const sync = useSyncStatus();
   const [stats, setStats] = useState({ files: 0, bytes: 0 });
   useEffect(() => {
     setStats(photosDirStats());
@@ -40,7 +43,21 @@ export function SettingsScreen(_: ScreenProps<"Settings">) {
           <P>
             {session?.name} · {session ? ROLE_LABELS[session.role] : ""}
           </P>
-          <Button title="Sign out" size="sm" onPress={() => Alert.alert("Sign out?", "Reports stay on this phone.", [{ text: "Cancel", style: "cancel" }, { text: "Sign out", style: "destructive", onPress: signOut }])} />
+          {session?.email ? <Small>{session.email}</Small> : null}
+          <Button title="Sign out" size="sm" onPress={() => Alert.alert("Sign out?", "Reports stay on this phone; anything not yet uploaded waits until you sign back in.", [{ text: "Cancel", style: "cancel" }, { text: "Sign out", style: "destructive", onPress: signOut }])} />
+        </Card>
+
+        <Card>
+          <H2>Shared map</H2>
+          <Small>
+            {sync.pending === 0
+              ? `Everything on this phone is on the shared map.${sync.lastSyncAt ? ` Last checked ${shortDateTime(sync.lastSyncAt)}.` : ""}`
+              : `${sync.pending} change${sync.pending === 1 ? "" : "s"} waiting to upload.`}
+          </Small>
+          {sync.lastError ? <Notice tone="warn">Last attempt failed: {sync.lastError}</Notice> : null}
+          <Row>
+            <Button title={sync.running ? "Syncing…" : "Sync now"} variant="primary" size="sm" loading={sync.running} onPress={() => void syncNow()} />
+          </Row>
         </Card>
 
         <Card>
@@ -91,9 +108,9 @@ export function SettingsScreen(_: ScreenProps<"Settings">) {
         <Card>
           <H2>About this build</H2>
           <Small>Version {version}</Small>
-          <Small>Vision model: {classifierName()}. Set EXPO_PUBLIC_AI_ENDPOINT at build time to add one; the app records the model name on every report.</Small>
-          <Small>Map: Apple Maps. Location: precise, only while capturing, plus Always during a Glasses Walk (the OS shows a blue indicator).</Small>
-          <Small>Data stays on this phone until you export it. Photos of the public right-of-way only; no faces, plates, or house numbers get published.</Small>
+          <Small>Vision model: {classifierName()} — suggests type and severity from the photo using published sidewalk-condition criteria (PROWAG displacement tiers, FHWA crack classes); you confirm every read, and the model name is recorded on the report. Budget-capped server-side; when the cap is hit you simply pick by hand.</Small>
+          <Small>Maps: Apple Maps for pinning, Mapbox for the shared map tab. Location: precise, only while capturing, plus Always during a Glasses Walk (the OS shows a blue indicator).</Small>
+          <Small>Reports and their photos upload to the shared public map (sidequestatx.org data, CC BY 4.0). Photos of the public right-of-way only; no faces, plates, or house numbers get published.</Small>
         </Card>
       </Stack>
     </Screen>

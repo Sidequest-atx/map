@@ -1,15 +1,18 @@
+import { supabase, SUPABASE_URL } from "../lib/supabase";
 import type { HazardType, Severity } from "../types";
 
 /**
  * Hazard photo classification.
  *
- * The web prototype ships a pixel-statistics mock; the phone does not pretend.
- * With EXPO_PUBLIC_AI_ENDPOINT set (same contract as the site's VITE_AI_ENDPOINT:
- * POST { op: "classify", image: dataUrl } → ClassificationResult), the app asks
- * the model and shows the read as a suggestion the reporter confirms.
- * Without it, classify() resolves to null and the reporter picks the type.
- * Either way the model name is recorded on the report, so the dataset stays
- * auditable as models improve through 2031.
+ * The default classifier is Claude behind the sq-classify Supabase edge
+ * function (severity rubric + budget cap documented in
+ * supabase/functions/sq-classify/RUBRIC.md); EXPO_PUBLIC_AI_ENDPOINT
+ * overrides it with any endpoint speaking the same contract:
+ * POST { op: "classify", image: dataUrl } → ClassificationResult.
+ * The read is a suggestion the reporter confirms — never a decision — and a
+ * null result (offline, signed out, budget spent) simply means the reporter
+ * picks the type themselves. The model name is recorded on every report, so
+ * the dataset stays auditable as models improve through 2031.
  */
 export interface ClassificationResult {
   label: HazardType;
@@ -20,31 +23,33 @@ export interface ClassificationResult {
   reason: string;
 }
 
-const ENDPOINT = process.env.EXPO_PUBLIC_AI_ENDPOINT;
+const ENDPOINT = process.env.EXPO_PUBLIC_AI_ENDPOINT || `${SUPABASE_URL}/functions/v1/sq-classify`;
 
 export function classifierAvailable(): boolean {
-  return Boolean(ENDPOINT);
+  return true;
 }
 
 export function classifierName(): string {
-  return ENDPOINT ? "remote" : "none on this build";
+  return process.env.EXPO_PUBLIC_AI_ENDPOINT ? "remote" : "Claude (sq-classify)";
 }
 
 const VALID: HazardType[] = ["crack", "lifted", "vegetation", "missing-ramp", "missing-sidewalk", "debris", "other"];
 const SEVS: Severity[] = ["low", "moderate", "severe"];
 
-export async function classifyHazardPhoto(jpegBase64: string, timeoutMs = 12_000): Promise<ClassificationResult | null> {
-  if (!ENDPOINT) return null;
+export async function classifyHazardPhoto(jpegBase64: string, timeoutMs = 25_000): Promise<ClassificationResult | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
+    const { data } = await supabase().auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return null; // classifier needs a signed-in reporter
     const res = await fetch(ENDPOINT, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ op: "classify", image: `data:image/jpeg;base64,${jpegBase64}` }),
       signal: ctrl.signal,
     });
-    if (!res.ok) throw new Error(`Classifier responded ${res.status}`);
+    if (!res.ok) return null; // offline, budget spent, or upstream trouble — the reporter picks by hand
     const json = (await res.json()) as Partial<ClassificationResult>;
     const label = VALID.includes(json.label as HazardType) ? (json.label as HazardType) : "other";
     const severity = SEVS.includes(json.severity as Severity) ? (json.severity as Severity) : "moderate";
@@ -56,6 +61,8 @@ export async function classifyHazardPhoto(jpegBase64: string, timeoutMs = 12_000
       alternatives: (json.alternatives ?? []).filter((a) => VALID.includes(a.label)),
       reason: json.reason ?? "",
     };
+  } catch {
+    return null; // never block a report on the classifier
   } finally {
     clearTimeout(timer);
   }

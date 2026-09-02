@@ -89,7 +89,7 @@ export function ReportDetailScreen({ route, navigation }: ScreenProps<"ReportDet
 
   function remove() {
     if (!r) return;
-    Alert.alert("Delete this report?", "The photo files on this phone go with it. The copy in the Photos album stays.", [
+    Alert.alert("Delete this report?", r.remoteId ? "It is removed from the shared map too. The copy in the Photos album stays." : "The photo files on this phone go with it. The copy in the Photos album stays.", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
@@ -112,6 +112,7 @@ export function ReportDetailScreen({ route, navigation }: ScreenProps<"ReportDet
           <StatusBadge s={r.status} />
           <Badge>{SOURCE_LABELS[r.source]}</Badge>
           {r.ai ? <Badge tone="ai">AI {Math.round(r.ai.confidence * 100)}%</Badge> : null}
+          {r.remoteId ? <Badge tone="ok">On the shared map</Badge> : <Badge tone="warn">Uploading…</Badge>}
         </Row>
         <View>
           <Text style={T.h1}>{HAZARD_LABELS[r.type]}</Text>
@@ -178,7 +179,7 @@ export function ReportDetailScreen({ route, navigation }: ScreenProps<"ReportDet
             <Button title="Delete report" variant="danger" size="sm" onPress={remove} loading={busy} />
           </Card>
         ) : (
-          <Small>Signed in as {session?.role.replace("-", " ")}. Status changes need the moderator role (Settings → sign out → pick moderator).</Small>
+          <Small>Signed in as {session?.role.replace("-", " ")}. Status changes need the moderator role, which is granted by SideQuest, not chosen on the phone.</Small>
         )}
       </Stack>
     </Screen>

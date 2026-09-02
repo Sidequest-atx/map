@@ -127,38 +127,67 @@ function Tree({ r }: { r: number }) {
   );
 }
 
-/** Stylized Austin landmarks, plan view, labeled like the rest of the drawing. */
-function Capitol() {
-  return (
-    <g>
-      <rect x="-64" y="-22" width="128" height="44" rx="2" fill="var(--olive-800)" opacity="0.09" />
-      <rect x="-64" y="-22" width="128" height="44" rx="2" fill="none" stroke="var(--line-strong)" strokeWidth="1.8" opacity="0.55" />
-      <rect x="-16" y="-48" width="32" height="96" rx="2" fill="var(--olive-800)" opacity="0.07" />
-      <rect x="-16" y="-48" width="32" height="96" rx="2" fill="none" stroke="var(--line-strong)" strokeWidth="1.6" opacity="0.5" />
-      <circle r="20" fill="var(--field)" stroke="var(--line-strong)" strokeWidth="1.8" opacity="0.9" />
-      <circle r="12" fill="none" stroke="var(--line-strong)" strokeWidth="1.1" opacity="0.6" />
-      <circle r="4.5" fill="var(--olive-800)" opacity="0.35" />
-    </g>
-  );
-}
+/* Austin landmarks, plan view, drawn as the actual places — not icons. */
 
-function UtTower() {
-  return (
-    <g>
-      <rect x="-30" y="-30" width="60" height="60" rx="2" fill="var(--olive-800)" opacity="0.08" />
-      <rect x="-30" y="-30" width="60" height="60" rx="2" fill="none" stroke="var(--line-strong)" strokeWidth="1.6" opacity="0.5" />
-      <rect x="-13" y="-13" width="26" height="26" fill="var(--olive-800)" opacity="0.16" />
-      <rect x="-13" y="-13" width="26" height="26" fill="none" stroke="var(--line-strong)" strokeWidth="1.6" opacity="0.7" />
-      <rect x="-6" y="-6" width="12" height="12" fill="none" stroke="var(--line-strong)" strokeWidth="1" opacity="0.55" />
-    </g>
-  );
-}
-
+/** Barton Springs: Barton Creek widens into the dammed pool. Deck and
+    bathhouse on the north bank, diving board, lawn and trees on the
+    south hillside, the creek leaving over the downstream dam. */
 function BartonSprings() {
   return (
     <g>
-      <rect x="-58" y="-17" width="116" height="34" rx="17" fill="var(--info-bg)" stroke="var(--info)" strokeWidth="1.6" opacity="0.85" />
-      <path d="M-40 -2 C -30 -6, -20 2, -10 -2 M0 4 C 10 0, 20 8, 30 4" fill="none" stroke="var(--info)" strokeWidth="1.3" opacity="0.5" strokeLinecap="round" />
+      <ellipse cx="8" cy="34" rx="92" ry="20" fill="var(--olive-200)" opacity="0.3" />
+      <path d="M-104 10 C -88 4, -76 8, -64 2 M64 -8 C 78 -10, 90 -4, 104 2" fill="none" stroke="var(--info)" strokeWidth="9" strokeLinecap="round" opacity="0.4" />
+      <path d="M-64 -12 C -34 -20, 34 -18, 64 -16 L 64 6 C 34 14, -34 12, -64 10 Z" fill="var(--info-bg)" stroke="var(--info)" strokeWidth="1.6" />
+      <path d="M-64 -12 L-64 10 M64 -16 L64 6" stroke="var(--line-strong)" strokeWidth="3" opacity="0.7" />
+      <path d="M-58 -16 L58 -20" stroke="var(--surface)" strokeWidth="6" opacity="0.9" />
+      <rect x="-44" y="-34" width="30" height="11" rx="1.5" fill="var(--olive-800)" opacity="0.12" />
+      <rect x="-44" y="-34" width="30" height="11" rx="1.5" fill="none" stroke="var(--line-strong)" strokeWidth="1.2" opacity="0.55" />
+      <path d="M20 -18 L20 -8" stroke="var(--line-strong)" strokeWidth="2.4" opacity="0.7" />
+      <path d="M-20 -4 C -17 -6, -14 -2, -11 -4 M28 -6 C 31 -8, 34 -4, 37 -6" fill="none" stroke="var(--info)" strokeWidth="1.4" opacity="0.7" strokeLinecap="round" />
+      <circle cx="-30" cy="32" r="9" fill="var(--olive-400)" opacity="0.4" />
+      <circle cx="12" cy="38" r="11" fill="var(--olive-300)" opacity="0.4" />
+      <circle cx="52" cy="30" r="8" fill="var(--olive-400)" opacity="0.35" />
+    </g>
+  );
+}
+
+const CAPITOL_WALKS = "M0 74 L0 30 M0 74 L-56 26 M0 74 L56 26 M-88 -2 L-38 -2 M88 -2 L38 -2 M-62 -78 L-26 -40 M62 -78 L26 -40";
+
+/** The Texas Capitol: sunset-red granite cross with the dome at the
+    crossing, set on grounds laced with the Great Walk's radiating
+    sidewalks — which is, after all, the subject of this page. */
+function Capitol() {
+  return (
+    <g>
+      <rect x="-88" y="-78" width="176" height="152" rx="4" fill="var(--olive-200)" opacity="0.2" />
+      <rect x="-88" y="-78" width="176" height="152" rx="4" fill="none" stroke="var(--line)" strokeWidth="1.2" opacity="0.6" />
+      <path d={CAPITOL_WALKS} fill="none" stroke="var(--line)" strokeWidth="7" opacity="0.4" />
+      <path d={CAPITOL_WALKS} fill="none" stroke="var(--surface)" strokeWidth="5" opacity="0.95" />
+      <rect x="-58" y="-16" width="116" height="34" rx="2" fill="var(--sev-severe-bg)" stroke="var(--line-strong)" strokeWidth="1.6" />
+      <rect x="-15" y="-58" width="30" height="88" rx="2" fill="var(--sev-severe-bg)" stroke="var(--line-strong)" strokeWidth="1.5" />
+      <circle r="19" fill="var(--sev-severe-bg)" stroke="var(--line-strong)" strokeWidth="1.8" />
+      <circle r="11" fill="none" stroke="var(--line-strong)" strokeWidth="1" opacity="0.6" />
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
+        <line key={a} x1="0" y1="-17" x2="0" y2="-7" transform={`rotate(${a})`} stroke="var(--line-strong)" strokeWidth="1" opacity="0.45" />
+      ))}
+      <circle r="2.5" fill="var(--line-strong)" opacity="0.6" />
+    </g>
+  );
+}
+
+/** UT: the Main Building and Tower (burnt orange) over the South Mall,
+    its twin walks running down the lawns to Littlefield Fountain. */
+function UtTower() {
+  return (
+    <g>
+      <rect x="-36" y="-52" width="72" height="30" rx="2" fill="var(--olive-800)" opacity="0.08" />
+      <rect x="-36" y="-52" width="72" height="30" rx="2" fill="none" stroke="var(--line-strong)" strokeWidth="1.6" opacity="0.55" />
+      <rect x="-12" y="-48" width="24" height="24" fill="var(--sev-moderate-bg)" stroke="var(--sev-moderate)" strokeWidth="1.8" />
+      <rect x="-6" y="-42" width="12" height="12" fill="none" stroke="var(--sev-moderate)" strokeWidth="1" opacity="0.7" />
+      <rect x="-30" y="-16" width="60" height="66" fill="var(--olive-200)" opacity="0.28" />
+      <path d="M-30 -16 L-30 50 M30 -16 L30 50 M-10 -16 L-10 50 M10 -16 L10 50 M-30 8 L30 8 M-30 30 L30 30" stroke="var(--surface)" strokeWidth="4" opacity="0.95" fill="none" />
+      <circle cy="62" r="10" fill="var(--info-bg)" stroke="var(--info)" strokeWidth="1.6" />
+      <circle cy="62" r="4" fill="none" stroke="var(--info)" strokeWidth="1" opacity="0.6" />
     </g>
   );
 }
@@ -543,20 +572,24 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
               </text>
             </Scene>
 
-            {/* ---- the math: patched, repatched, never rebuilt ---- */}
+            {/* ---- the math: a reported panel got its patch — in this story
+                 the patch is the WIN. Its unreported neighbor is the problem. ---- */}
             <Scene pts={pts} f={SCENES.math}>
-              <rect x="-20" y="-60" width="38" height="46" rx="3" fill="var(--olive-800)" opacity="0.14" />
-              <rect x="-14" y="8" width="30" height="34" rx="3" fill="var(--olive-800)" opacity="0.1" />
-              <g transform="translate(-6 72)">
-                <Crack seed={211} o={0.6} span={40} />
+              <rect x="-20" y="-58" width="38" height="44" rx="3" fill="var(--field-2)" stroke="var(--olive-600)" strokeWidth="1.8" />
+              <rect x="-14" y="-6" width="30" height="26" rx="3" fill="var(--field-2)" stroke="var(--olive-600)" strokeWidth="1.5" opacity="0.9" />
+              <g transform="translate(-2 46)">
+                <Crack seed={216} o={0.9} span={56} />
               </g>
-              <g transform="translate(15 -80) rotate(52)">
-                <Crack seed={212} o={0.55} span={30} />
+              <g transform="translate(4 58) rotate(72)">
+                <Crack seed={218} o={0.7} span={34} />
               </g>
             </Scene>
             <Scene pts={pts} f={SCENES.math} rotate={false}>
-              <text x="48" y="2" fontSize="15" fill="var(--ink-mute)" fontFamily="var(--font-mono)">
-                patched, not rebuilt
+              <text x="48" y="-30" fontSize="15" fill="var(--ink-mute)" fontFamily="var(--font-mono)">
+                patched: someone reported it
+              </text>
+              <text x="48" y="52" fontSize="15" fill="var(--ink-mute)" fontFamily="var(--font-mono)" opacity="0.85">
+                nobody reported this one
               </text>
             </Scene>
 
@@ -671,21 +704,21 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
             ))}
 
             {/* Austin, off in the drawing's distance */}
-            <Scene pts={pts} f={0.56} d={236} rotate={false}>
+            <Scene pts={pts} f={0.56} d={252} rotate={false}>
               <BartonSprings />
-              <text y="36" textAnchor="middle" fontSize="12" fill="var(--ink-mute)" fontFamily="var(--font-mono)">
+              <text y="66" textAnchor="middle" fontSize="12" fill="var(--ink-mute)" fontFamily="var(--font-mono)">
                 barton springs
               </text>
             </Scene>
-            <Scene pts={pts} f={0.93} d={212} rotate={false}>
+            <Scene pts={pts} f={0.93} d={216} rotate={false}>
               <UtTower />
-              <text y="48" textAnchor="middle" fontSize="12" fill="var(--ink-mute)" fontFamily="var(--font-mono)">
+              <text y="86" textAnchor="middle" fontSize="12" fill="var(--ink-mute)" fontFamily="var(--font-mono)">
                 ut tower
               </text>
             </Scene>
-            <Scene pts={pts} f={0.975} d={-210} rotate={false}>
+            <Scene pts={pts} f={0.975} d={-212} rotate={false}>
               <Capitol />
-              <text y="66" textAnchor="middle" fontSize="12" fill="var(--ink-mute)" fontFamily="var(--font-mono)">
+              <text y="90" textAnchor="middle" fontSize="12" fill="var(--ink-mute)" fontFamily="var(--font-mono)">
                 the capitol
               </text>
             </Scene>

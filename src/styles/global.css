@@ -3053,21 +3053,6 @@ dialog.sheet-dialog[open] {
   width: min(40vw, 420px);
   aspect-ratio: 1;
 }
-.motif--walker {
-  left: 50%;
-  bottom: 4%;
-  transform: translateX(-50%);
-  width: min(88vw, 980px);
-  aspect-ratio: 8 / 3;
-  mask-image: linear-gradient(to right, transparent 0%, black 22%);
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 22%);
-}
-.motif--roots {
-  left: -2%;
-  bottom: 2%;
-  width: min(46vw, 560px);
-  aspect-ratio: 3 / 2;
-}
 @media (max-width: 720px) {
   .motif--crack {
     width: 120vw;
@@ -3076,14 +3061,6 @@ dialog.sheet-dialog[open] {
   .motif--root,
   .motif--lip {
     width: 90vw;
-  }
-  .motif--walker {
-    width: 150vw;
-    bottom: 2%;
-  }
-  .motif--roots {
-    width: 80vw;
-    left: -12%;
   }
 }
 @media (prefers-reduced-transparency: reduce), print {

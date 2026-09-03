@@ -407,14 +407,18 @@ function smoothPath(pts: [number, number][]) {
   return d + ` L${last[0].toFixed(1)} ${last[1].toFixed(1)}`;
 }
 
+/* A crack is a SHAPE, not a stroke: a dark tapered gash (wide in the
+   middle, pinched to nothing at the ends), one lip catching the light,
+   spalled chips straddling it, debris specks beside it. Hairline branches
+   stay thin — hairlines really are lines. */
 function crackShape(seed: number, span?: number) {
   const r = rng(seed);
   const sp = span ?? 38 + r() * 20;
-  // Personality, all drawn from the seed so no two cracks share a character:
   const wob = 0.2 + r() * 0.45; // how much it wanders
   const turnP = 0.07 + r() * 0.16; // how often it takes a real turn
   const stride = 1.8 + r() * 2.2; // segment length
   const branchMax = Math.floor(r() * 4); // 0–3 hairline branches
+  const wMax = 1.7 + r() * 2.4; // gash width personality
   const cY = (v: number) => Math.max(-23, Math.min(23, v));
   let x = -sp / 2;
   let y = cY((r() - 0.5) * 30);
@@ -446,19 +450,114 @@ function crackShape(seed: number, span?: number) {
       branches.push({ d: smoothPath(bpts), w: 0.7 + r() * 0.4 });
     }
   }
-  return { main: smoothPath(main), branches, w: 1.05 + r() * 0.7 };
+  // Offset both lips around the centerline with a tapered width profile.
+  const n = main.length - 1;
+  const left: [number, number][] = [];
+  const right: [number, number][] = [];
+  for (let i = 0; i <= n; i++) {
+    const p0 = main[Math.max(0, i - 1)];
+    const p1 = main[Math.min(n, i + 1)];
+    let dx = p1[0] - p0[0];
+    let dy = p1[1] - p0[1];
+    const L = Math.hypot(dx, dy) || 1;
+    dx /= L;
+    dy /= L;
+    const half = (wMax * (0.12 + 0.88 * Math.sin((Math.PI * i) / n)) * (0.72 + r() * 0.56)) / 2;
+    left.push([main[i][0] - dy * half, main[i][1] + dx * half]);
+    right.push([main[i][0] + dy * half, main[i][1] - dx * half]);
+  }
+  const pt = (p: [number, number]) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
+  const hull = "M" + left.map(pt).join(" L") + " L" + [...right].reverse().map(pt).join(" L") + " Z";
+  const light = "M" + left.map(pt).join(" L");
+  const spalls: string[] = [];
+  const spallN = Math.floor(r() * 3);
+  for (let k = 0; k < spallN; k++) {
+    const i = 2 + Math.floor(r() * Math.max(1, n - 4));
+    const [cx, cy] = main[i];
+    const sr = 2.4 + r() * 3;
+    spalls.push(
+      `M${(cx - sr).toFixed(1)} ${(cy - r() * sr).toFixed(1)} L${(cx + r() * sr).toFixed(1)} ${(cy - sr).toFixed(1)} L${(cx + sr).toFixed(1)} ${(cy + r() * sr).toFixed(1)} L${(cx - r() * sr).toFixed(1)} ${(cy + sr).toFixed(1)} Z`,
+    );
+  }
+  const specks: [number, number, number][] = [];
+  const speckN = 3 + Math.floor(r() * 4);
+  for (let k = 0; k < speckN; k++) {
+    const i = Math.floor(r() * n);
+    specks.push([main[i][0] + (r() - 0.5) * 12, main[i][1] + (r() - 0.5) * 12, 0.7 + r() * 0.9]);
+  }
+  return { hull, light, branches, spalls, specks };
 }
 
 function Crack({ seed, rot = 0, o = 0.62, span }: { seed: number; rot?: number; o?: number; span?: number }) {
   const c = crackShape(seed, span);
   return (
     <g transform={rot ? `rotate(${rot})` : undefined} opacity={o}>
-      {c.w > 1.45 && (
-        <path d={c.main} fill="none" stroke="var(--line-strong)" strokeWidth={c.w * 2.4} strokeLinejoin="round" strokeLinecap="round" opacity="0.14" />
-      )}
-      <path d={c.main} fill="none" stroke="var(--line-strong)" strokeWidth={c.w} strokeLinejoin="round" strokeLinecap="round" />
+      {c.spalls.map((s, i) => (
+        <path key={`s${i}`} d={s} fill="var(--line-strong)" opacity="0.26" />
+      ))}
+      <path d={c.hull} fill="var(--olive-900)" opacity="0.62" />
+      <path d={c.light} fill="none" stroke="var(--surface)" strokeWidth="0.8" opacity="0.55" />
       {c.branches.map((b, i) => (
-        <path key={i} d={b.d} fill="none" stroke="var(--line-strong)" strokeWidth={b.w} strokeLinejoin="round" strokeLinecap="round" />
+        <path key={i} d={b.d} fill="none" stroke="var(--olive-900)" strokeWidth={b.w} strokeLinejoin="round" strokeLinecap="round" opacity="0.55" />
+      ))}
+      {c.specks.map(([sx, sy, sr], i) => (
+        <circle key={`k${i}`} cx={sx} cy={sy} r={sr} fill="var(--olive-900)" opacity="0.35" />
+      ))}
+    </g>
+  );
+}
+
+/* A pothole, decal-style: an irregular spalled ring of exposed base, the
+   dark hole offset inside it (so a lip shows toward the light), a deeper
+   core, hairline rays, and loose chunks beside it. */
+function potholeShape(seed: number, R: number) {
+  const r = rng(seed);
+  const blob = (scale: number, ox: number, oy: number) => {
+    const nV = 9;
+    let d = "";
+    for (let i = 0; i < nV; i++) {
+      const th = (i / nV) * Math.PI * 2;
+      const rad = R * scale * (0.7 + r() * 0.55);
+      d += (i ? " L" : "M") + (ox + Math.cos(th) * rad).toFixed(1) + " " + (oy + Math.sin(th) * rad).toFixed(1);
+    }
+    return d + " Z";
+  };
+  const rays: string[] = [];
+  for (let k = 0; k < 2; k++) {
+    let th = r() * Math.PI * 2;
+    let px = Math.cos(th) * R;
+    let py = Math.sin(th) * R;
+    let d = `M${px.toFixed(1)} ${py.toFixed(1)}`;
+    for (let j = 0; j < 3; j++) {
+      th += (r() - 0.5) * 0.8;
+      px += Math.cos(th) * (2.5 + r() * 3);
+      py += Math.sin(th) * (2.5 + r() * 3);
+      d += ` L${px.toFixed(1)} ${py.toFixed(1)}`;
+    }
+    rays.push(d);
+  }
+  return {
+    outer: blob(1, 0, 0),
+    hole: blob(0.64, R * 0.14, R * 0.11),
+    core: blob(0.38, R * 0.24, R * 0.2),
+    chips: [blob(0.16, R * 1.3, R * 0.45), blob(0.13, -R * 1.15, R * 0.85)],
+    rays,
+  };
+}
+
+function Pothole({ seed, R = 12 }: { seed: number; R?: number }) {
+  const s = potholeShape(seed, R);
+  return (
+    <g>
+      {s.rays.map((d, i) => (
+        <path key={`r${i}`} d={d} fill="none" stroke="var(--olive-900)" strokeWidth="0.9" opacity="0.45" strokeLinecap="round" />
+      ))}
+      <path d={s.outer} fill="var(--field-3)" stroke="var(--line-strong)" strokeWidth="1.1" opacity="0.95" />
+      <path d={s.hole} fill="var(--olive-900)" opacity="0.42" />
+      <path d={s.core} fill="var(--olive-900)" opacity="0.5" />
+      <path d={s.outer} fill="none" stroke="var(--surface)" strokeWidth="1" opacity="0.35" strokeDasharray="7 15" />
+      {s.chips.map((d, i) => (
+        <path key={`c${i}`} d={d} fill="var(--field-3)" stroke="var(--line-strong)" strokeWidth="0.7" opacity="0.65" />
       ))}
     </g>
   );
@@ -554,6 +653,8 @@ const FAR_HOUSES: [number, number, number, number][] = [
 const DOWNTOWN: [number, number, number, number, number][] = [
   [0.78, -198, 104, 78, 62], [0.85, -205, 118, 88, 74], [0.905, -208, 96, 74, 88], [0.94, -195, 100, 78, 68],
   [0.8, 205, 100, 78, 58], [0.87, 210, 108, 84, 92], [0.935, 212, 96, 76, 76],
+  // background skyline filling the frame's corners
+  [0.825, -335, 112, 90, 98], [0.9, 338, 120, 96, 106],
 ];
 const TREES: [number, number, number][] = [
   // suburban live oaks, both sides
@@ -563,6 +664,22 @@ const TREES: [number, number, number][] = [
   [0.77, -44, 15], [0.86, -44, 15], [0.955, -44, 14],
 ];
 const MAILBOXES: number[] = [0.105, 0.215, 0.325, 0.44, 0.57, 0.7];
+/* Potholes: on the walk [f, seed, R, d] and out in the street. */
+const WALK_POTHOLES: [number, number, number, number][] = [
+  [0.318, 301, 8, 6], [0.585, 305, 7, -7], [0.73, 309, 8, 4],
+];
+const STREET_POTHOLES: [number, number, number, number][] = [
+  [0.3, 311, 15, -18], [0.62, 313, 17, 16], [0.895, 315, 13, -14],
+];
+/* A second row of homes and trees behind the first, so the frame fills
+   like a real subdivision instead of a lone street in a void. */
+const BACK_HOUSES: [number, number, number, number][] = [
+  [0.07, -345, 2, 2], [0.19, -372, -2, 1], [0.335, -340, 0, 0], [0.475, -365, 3, 2], [0.615, -345, -3, 0],
+  [0.1, 352, 0, 1], [0.3, 368, 2, 0], [0.52, 342, -2, 2], [0.68, 360, 3, 0],
+];
+const BACK_TREES: [number, number, number][] = [
+  [0.14, -410, 40], [0.42, -402, 46], [0.66, -400, 36], [0.26, 415, 38], [0.56, 412, 44],
+];
 
 type Standing = { k: string; depth: number; x: number; y: number; node: ReactNode };
 
@@ -606,9 +723,10 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
     const ny = Math.cos(p.a);
     return { x1: p.x + nx * from, y1: p.y + ny * from, x2: p.x + nx * to, y2: p.y + ny * to };
   };
-  /* every near house gets a front walk; a handful of lots get driveways */
-  const walkways = NEAR_HOUSES.map(([f]) => strip(f, -26, -136));
-  const driveways = [0.13, 0.325, 0.47, 0.63, 0.76].map((f) => strip(f, 56, -136));
+  /* every near house gets a front walk that actually reaches its door;
+     a handful of lots get driveways */
+  const walkways = NEAR_HOUSES.map(([f]) => strip(f, -26, -162));
+  const driveways = [0.13, 0.325, 0.47, 0.63, 0.76].map((f) => strip(f, 56, -162));
 
   /* Everything that stands gets collected here and painted back-to-front
      (screen depth in this shear is simply plan x + y). */
@@ -656,6 +774,26 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
       add(`mb${i}`, pts, f, 44, () => (
         <Bill>
           <Mailbox />
+        </Bill>
+      )),
+    );
+    BACK_HOUSES.forEach(([f, d, tilt, v], i) => {
+      const k = HOUSE_KIND[v];
+      add(`bh${i}`, pts, f, d, (a) => (
+        <IsoHouse
+          w={k.w * 0.78}
+          d={k.d * 0.78}
+          h={k.h * 0.78}
+          rh={k.rh * 0.78}
+          roof={k.roof}
+          rot={a + (k.end ? Math.PI / 2 : 0) + (tilt * Math.PI) / 180}
+        />
+      ));
+    });
+    BACK_TREES.forEach(([f, d, r], i) =>
+      add(`bt2${i}`, pts, f, d, () => (
+        <Bill>
+          <IsoTree r={r} />
         </Bill>
       )),
     );
@@ -765,10 +903,14 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
           <g transform={ISO_M}>
             <motion.g style={{ x, y }}>
               {/* the land itself: suburban lawns give way to downtown paving */}
+              <path d={subPath(pts, 0.005, 0.75, () => -350)} fill="none" stroke="var(--olive-200)" strokeWidth="260" strokeLinecap="butt" opacity="0.13" />
+              <path d={subPath(pts, 0.02, 0.74, () => 360)} fill="none" stroke="var(--olive-200)" strokeWidth="240" strokeLinecap="butt" opacity="0.11" />
               <path d={subPath(pts, 0.01, 0.745, () => -152)} fill="none" stroke="var(--olive-200)" strokeWidth="120" strokeLinecap="butt" opacity="0.26" />
               <path d={subPath(pts, 0.03, 0.735, () => 176)} fill="none" stroke="var(--olive-200)" strokeWidth="110" strokeLinecap="butt" opacity="0.2" />
               <path d={subPath(pts, 0.765, 0.985, () => -142)} fill="none" stroke="var(--field-3)" strokeWidth="130" strokeLinecap="butt" opacity="0.45" />
               <path d={subPath(pts, 0.77, 0.985, () => 168)} fill="none" stroke="var(--field-3)" strokeWidth="112" strokeLinecap="butt" opacity="0.4" />
+              <path d={subPath(pts, 0.77, 0.985, () => -330)} fill="none" stroke="var(--field-3)" strokeWidth="220" strokeLinecap="butt" opacity="0.26" />
+              <path d={subPath(pts, 0.775, 0.985, () => 340)} fill="none" stroke="var(--field-3)" strokeWidth="200" strokeLinecap="butt" opacity="0.24" />
 
               {/* driveways and front walks, under everything paved */}
               {driveways.map((s, i) => (
@@ -785,6 +927,11 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
               {[0.22, 0.45, 0.68, 0.86].map((f, i) => (
                 <Scene key={`m${i}`} pts={streetPts} f={f} d={i % 2 ? 14 : -12}>
                   <Manhole />
+                </Scene>
+              ))}
+              {STREET_POTHOLES.map(([f, seed, R, d], i) => (
+                <Scene key={`sp${i}`} pts={streetPts} f={f} d={d} rotate={false}>
+                  <Pothole seed={seed} R={R} />
                 </Scene>
               ))}
 
@@ -821,6 +968,11 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
                     <circle cx={RIBBON / 2 + 2} cy="0" r="6.5" fill="var(--field)" />
                     <path d={`M${RIBBON / 2 - 5} -6 L${RIBBON / 2 - 1} -1 L${RIBBON / 2 - 6} 5`} fill="none" stroke="var(--line-strong)" strokeWidth="1.5" opacity="0.6" />
                   </g>
+                </Scene>
+              ))}
+              {WALK_POTHOLES.map(([f, seed, R, d], i) => (
+                <Scene key={`wp${i}`} pts={pts} f={f} d={d} rotate={false}>
+                  <Pothole seed={seed} R={R} />
                 </Scene>
               ))}
 

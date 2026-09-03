@@ -83,8 +83,13 @@ function subPath(pts: Pt[], f1: number, f2: number, wiggle?: (i: number) => numb
   return d;
 }
 
-/** The never-built stretch, in path fractions. */
-const GAP: [number, number] = [0.163, 0.197];
+/** The never-built stretches, in path fractions: the labeled suburban one
+    the story stops at, and a second, wordless one on the way downtown. */
+const GAPS: [number, number][] = [
+  [0.163, 0.197],
+  [0.826, 0.846],
+];
+const inAnyGap = (f1: number, f2: number) => GAPS.some(([g1, g2]) => f2 > g1 - 0.004 && f1 < g2 + 0.004);
 
 /** Flat, on the ground: positioned on the path, optionally rotated to the
     walk direction. Rendered inside the projection, so it shears with it. */
@@ -182,7 +187,21 @@ function IsoBox({
 /** A house: tall shaded walls under a full-width pitched roof with eaves.
     The roof's two slopes take the light differently, so the volume reads
     at a glance. */
-function IsoHouse({ w = 64, d = 58, h = 30, rh = 20, rot = 0 }: { w?: number; d?: number; h?: number; rh?: number; rot?: number }) {
+function IsoHouse({
+  w = 64,
+  d = 58,
+  h = 30,
+  rh = 20,
+  rot = 0,
+  roof = "var(--olive-400)",
+}: {
+  w?: number;
+  d?: number;
+  h?: number;
+  rh?: number;
+  rot?: number;
+  roof?: string;
+}) {
   const c = Math.cos(rot);
   const s = Math.sin(rot);
   const rp = (x: number, y: number): [number, number] => [x * c - y * s, x * s + y * c];
@@ -197,10 +216,10 @@ function IsoHouse({ w = 64, d = 58, h = 30, rh = 20, rot = 0 }: { w?: number; d?
   const gableL = [e[0], e[3], r1] as [number, number][];
   const gableR = [e[1], e[2], r2] as [number, number][];
   const faces = [
-    { q: slopeA, fill: "var(--olive-400)", shade: 0.24 },
-    { q: slopeB, fill: "var(--olive-400)", shade: 0.03 },
-    { q: gableL, fill: "var(--olive-400)", shade: 0.14 },
-    { q: gableR, fill: "var(--olive-400)", shade: 0.14 },
+    { q: slopeA, fill: roof, shade: 0.24 },
+    { q: slopeB, fill: roof, shade: 0.03 },
+    { q: gableL, fill: roof, shade: 0.14 },
+    { q: gableR, fill: roof, shade: 0.14 },
   ].sort((a, b) => Math.max(...a.q.map((p) => p[1])) - Math.max(...b.q.map((p) => p[1])));
   return (
     <g>
@@ -310,24 +329,40 @@ function CapitolBill() {
   );
 }
 
-/** The UT Tower in elevation over the Main Building: window bays, the
-    burnt-orange clock, belfry and crown. */
-function UtTowerBill() {
+/** A pickup truck: cab forward, open bed behind. As Austin as the oaks. */
+function IsoPickup({ rot = 0 }: { rot?: number }) {
+  const c = Math.cos(rot);
+  const s = Math.sin(rot);
+  const rp = (x: number, y: number): [number, number] => [x * c - y * s, x * s + y * c];
+  const wheels = [rp(-15, -10), rp(15, -10), rp(-15, 10), rp(15, 10)].map(([x, y]) => iso(x, y, 0));
+  const shadow = boxCorners(50, 24, rot).map(([x, y]) => iso(x, y, 0));
+  const cabOff = iso(...rp(12, 0), 0);
+  const bedOff = iso(...rp(-10, 0), 0);
   return (
     <g>
-      <ellipse cy="2" rx="52" ry="5.5" fill="var(--olive-800)" opacity="0.08" />
-      <rect x="-44" y="-20" width="88" height="20" fill="var(--surface)" stroke="var(--line-strong)" strokeWidth="1.4" />
-      <path d="M-36 -15 L-36 -5 M-27 -15 L-27 -5 M-18 -15 L-18 -5 M18 -15 L18 -5 M27 -15 L27 -5 M36 -15 L36 -5" stroke="var(--line-strong)" strokeWidth="1" opacity="0.45" />
-      <rect x="-7" y="-14" width="14" height="14" fill="none" stroke="var(--line-strong)" strokeWidth="1.2" opacity="0.7" />
-      <rect x="-14" y="-100" width="28" height="80" fill="var(--surface)" stroke="var(--line-strong)" strokeWidth="1.5" />
-      <path d="M-7.5 -96 L-7.5 -26 M0 -96 L0 -26 M7.5 -96 L7.5 -26" stroke="var(--line-strong)" strokeWidth="2.2" opacity="0.25" />
-      <path d="M-14 -34 L14 -34 M-14 -48 L14 -48 M-14 -62 L14 -62 M-14 -76 L14 -76" stroke="var(--line-strong)" strokeWidth="0.7" opacity="0.25" />
-      <circle cy="-88" r="7.5" fill="var(--sev-moderate-bg)" stroke="var(--sev-moderate)" strokeWidth="1.7" />
-      <path d="M0 -88 L0 -93 M0 -88 L3.5 -86" stroke="var(--sev-moderate)" strokeWidth="1.3" strokeLinecap="round" />
-      <rect x="-16" y="-110" width="32" height="10" fill="var(--surface)" stroke="var(--line-strong)" strokeWidth="1.3" />
-      <path d="M-10 -108 L-10 -102 M-3 -108 L-3 -102 M3 -108 L3 -102 M10 -108 L10 -102" stroke="var(--line-strong)" strokeWidth="1" opacity="0.5" />
-      <rect x="-11" y="-118" width="22" height="8" fill="var(--sev-moderate-bg)" stroke="var(--sev-moderate)" strokeWidth="1.4" />
-      <rect x="-7" y="-123" width="14" height="5" fill="var(--surface)" stroke="var(--line-strong)" strokeWidth="1.1" />
+      <polygon points={poly(shadow.map(([px, py]) => [px + 4, py + 3] as [number, number]))} fill="var(--olive-900)" opacity="0.09" />
+      {wheels.map(([wx, wy], i) => (
+        <ellipse key={i} cx={wx} cy={wy} rx="4.2" ry="2.7" fill="var(--olive-900)" opacity="0.7" />
+      ))}
+      <IsoBox w={48} d={21} h={11} rot={rot} z0={2} top="var(--olive-500)" wall="var(--olive-700)" lineW={0.9} />
+      <g transform={`translate(${bedOff[0]} ${bedOff[1]})`}>
+        <IsoBox w={22} d={17} h={1.5} rot={rot} z0={13} top="var(--olive-800)" wall="var(--olive-700)" lineW={0.7} o={0.85} />
+      </g>
+      <g transform={`translate(${cabOff[0]} ${cabOff[1]})`}>
+        <IsoBox w={16} d={17} h={8} rot={rot} z0={13} top="var(--olive-200)" wall="var(--olive-100)" lineW={0.8} />
+      </g>
+    </g>
+  );
+}
+
+/** A curbside mailbox on its post, flag up. */
+function Mailbox() {
+  return (
+    <g>
+      <ellipse cy="1" rx="5" ry="2" fill="var(--olive-800)" opacity="0.12" />
+      <line y2="-13" stroke="var(--olive-800)" strokeWidth="2" strokeLinecap="round" />
+      <rect x="-5.5" y="-20" width="11" height="7.5" rx="3" fill="var(--field-3)" stroke="var(--line-strong)" strokeWidth="1" />
+      <path d="M5 -20 L5 -24 L7.5 -24" fill="none" stroke="var(--sev-severe)" strokeWidth="1.4" strokeLinecap="round" />
     </g>
   );
 }
@@ -465,10 +500,10 @@ const CRACKS: [number, number, number][] = [
   [0.375, 83, 0], [0.408, 89, 90], [0.44, 97, 0], [0.455, 103, 0],
   [0.545, 109, 0], [0.578, 113, 90], [0.612, 127, 0],
   [0.688, 131, 0], [0.715, 137, 0], [0.748, 139, 90],
-  [0.832, 149, 0], [0.862, 151, 0],
+  [0.808, 149, 0], [0.862, 151, 0],
 ];
 const CHIPS: [number, number][] = [
-  [0.06, 1], [0.155, -1], [0.235, 1], [0.43, -1], [0.53, 1], [0.705, -1], [0.845, 1],
+  [0.06, 1], [0.155, -1], [0.235, 1], [0.43, -1], [0.53, 1], [0.705, -1], [0.856, 1],
 ];
 
 /* No two panels the same age: seeded per-panel tints, boundaries locked to
@@ -480,7 +515,7 @@ const PANEL_TINTS: [number, number, number][] = (() => {
   const out: [number, number, number][] = [];
   for (let k = 0; (k + 1) * PANEL_F < 0.985; k++) {
     const f = k * PANEL_F;
-    if (f + PANEL_F > GAP[0] - 0.004 && f < GAP[1] + 0.004) continue;
+    if (inAnyGap(f, f + PANEL_F)) continue;
     const roll = r();
     let o: number;
     if (roll < 0.3) o = 0.025 + r() * 0.03;
@@ -500,16 +535,34 @@ const WEEDS: [number, number, number][] = [
   [0.05, 1, 1], [0.125, -1, 1.2], [0.235, 1, 0.9], [0.315, -1, 1.1],
   [0.435, 1, 1], [0.557, -1, 1.25], [0.63, 1, 0.85], [0.735, -1, 1.1], [0.815, 1, 0.95],
 ];
-const NEAR_HOUSES: [number, number, number][] = [
-  [0.08, -180, -2], [0.26, -186, 3], [0.42, -178, -3], [0.58, -188, 2], [0.72, -180, -2],
+
+/* The neighborhood: a real street of homes. [fraction, d, tilt°, variant]
+   Variants: 0 = ranch (long and low, side to the street), 1 = two-story
+   (compact, taller), 2 = gable-end to the street. The walk urbanizes after
+   ~0.74, where DOWNTOWN takes over. */
+const NEAR_HOUSES: [number, number, number, number][] = [
+  [0.045, -182, -2, 0], [0.105, -178, 2, 1], [0.155, -186, 0, 2], [0.215, -180, 3, 0],
+  [0.27, -184, -3, 1], [0.325, -178, 2, 0], [0.385, -186, -2, 2], [0.44, -180, 2, 1],
+  [0.5, -184, -2, 0], [0.57, -178, 3, 2], [0.63, -185, -2, 0], [0.72, -180, 2, 1],
 ];
-const FAR_HOUSES: [number, number, number][] = [
-  [0.18, 208, 3], [0.3, 214, -2], [0.5, 214, -2], [0.66, 210, 3], [0.82, 208, 2],
+const FAR_HOUSES: [number, number, number, number][] = [
+  [0.06, 210, 3, 1], [0.13, 216, -2, 0], [0.205, 208, 2, 2], [0.28, 214, -2, 0],
+  [0.35, 210, 3, 1], [0.425, 216, -3, 0], [0.495, 210, 2, 2], [0.6, 214, -2, 0],
+  [0.665, 208, 3, 1], [0.72, 214, -2, 0],
+];
+/* Downtown: taller mullioned blocks rising toward the Capitol. [f, d, w, dd, h] */
+const DOWNTOWN: [number, number, number, number, number][] = [
+  [0.78, -198, 104, 78, 62], [0.85, -205, 118, 88, 74], [0.905, -208, 96, 74, 88], [0.94, -195, 100, 78, 68],
+  [0.8, 205, 100, 78, 58], [0.87, 210, 108, 84, 92], [0.935, 212, 96, 76, 76],
 ];
 const TREES: [number, number, number][] = [
-  [0.12, -108, 30], [0.31, -100, 36], [0.53, -104, 28], [0.77, -110, 34],
-  [0.22, 176, 34], [0.4, 182, 38], [0.62, 178, 30], [0.88, 176, 36],
+  // suburban live oaks, both sides
+  [0.075, -112, 36], [0.24, -108, 42], [0.36, -104, 30], [0.475, -110, 38], [0.6, -106, 32], [0.7, -112, 40],
+  [0.09, 178, 32], [0.245, 182, 44], [0.41, 176, 34], [0.53, 184, 40], [0.685, 178, 30],
+  // downtown street trees, planted and regular
+  [0.77, -44, 15], [0.86, -44, 15], [0.955, -44, 14],
 ];
+const MAILBOXES: number[] = [0.105, 0.215, 0.325, 0.44, 0.57, 0.7];
 
 type Standing = { k: string; depth: number; x: number; y: number; node: ReactNode };
 
@@ -553,8 +606,9 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
     const ny = Math.cos(p.a);
     return { x1: p.x + nx * from, y1: p.y + ny * from, x2: p.x + nx * to, y2: p.y + ny * to };
   };
-  const walkways = [0.08, 0.26, 0.42, 0.58, 0.72].map((f) => strip(f, -26, -128));
-  const driveways = [0.13, 0.47, 0.76].map((f) => strip(f, 56, -128));
+  /* every near house gets a front walk; a handful of lots get driveways */
+  const walkways = NEAR_HOUSES.map(([f]) => strip(f, -26, -136));
+  const driveways = [0.13, 0.325, 0.47, 0.63, 0.76].map((f) => strip(f, 56, -136));
 
   /* Everything that stands gets collected here and painted back-to-front
      (screen depth in this shear is simply plan x + y). */
@@ -569,18 +623,42 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
       out.push({ k, depth: px + py + bias, x: px, y: py, node: make(p.a) });
     };
 
-    NEAR_HOUSES.forEach(([f, d, tilt], i) =>
-      add(`nh${i}`, pts, f, d, (a) => <IsoHouse rot={a + Math.PI / 2 + (tilt * Math.PI) / 180} />),
+    const HOUSE_KIND = [
+      { w: 82, d: 46, h: 21, rh: 13, end: false, roof: "var(--olive-400)" }, // ranch, long side to the street
+      { w: 56, d: 50, h: 34, rh: 18, end: false, roof: "var(--olive-500)" }, // two-story
+      { w: 52, d: 62, h: 26, rh: 18, end: true, roof: "var(--olive-300)" }, // gable end to the street
+    ] as const;
+    NEAR_HOUSES.forEach(([f, d, tilt, v], i) => {
+      const k = HOUSE_KIND[v];
+      add(`nh${i}`, pts, f, d, (a) => (
+        <IsoHouse w={k.w} d={k.d} h={k.h} rh={k.rh} roof={k.roof} rot={a + (k.end ? Math.PI / 2 : 0) + (tilt * Math.PI) / 180} />
+      ));
+    });
+    FAR_HOUSES.forEach(([f, d, tilt, v], i) => {
+      const k = HOUSE_KIND[v];
+      add(`fh${i}`, pts, f, d, (a) => (
+        <IsoHouse
+          w={k.w * 0.88}
+          d={k.d * 0.88}
+          h={k.h * 0.88}
+          rh={k.rh * 0.88}
+          roof={k.roof}
+          rot={a + (k.end ? Math.PI / 2 : 0) + (tilt * Math.PI) / 180}
+        />
+      ));
+    });
+    DOWNTOWN.forEach(([f, d, w, dd, h], i) =>
+      add(`dt${i}`, pts, f, d, (a) => (
+        <IsoBox w={w} d={dd} h={h} rot={a + Math.PI / 2 + (i % 3) * 0.04} top="var(--field-2)" wall="var(--field-3)" lineW={1.2} mullions />
+      )),
     );
-    FAR_HOUSES.forEach(([f, d, tilt], i) =>
-      add(`fh${i}`, pts, f, d, (a) => <IsoHouse w={58} d={52} h={26} rh={17} rot={a + Math.PI / 2 + (tilt * Math.PI) / 180} />),
+    MAILBOXES.forEach((f, i) =>
+      add(`mb${i}`, pts, f, 44, () => (
+        <Bill>
+          <Mailbox />
+        </Bill>
+      )),
     );
-    add("bldgA", pts, 0.85, -205, (a) => (
-      <IsoBox w={150} d={110} h={46} rot={a + Math.PI / 2} top="var(--field-2)" wall="var(--field-3)" lineW={1.2} mullions />
-    ));
-    add("bldgB", pts, 0.94, -195, (a) => (
-      <IsoBox w={124} d={92} h={38} rot={a + Math.PI / 2 + 0.07} top="var(--field-2)" wall="var(--field-3)" lineW={1.2} mullions />
-    ));
     TREES.forEach(([f, d, r], i) =>
       add(`t${i}`, pts, f, d, () => (
         <Bill>
@@ -600,26 +678,28 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
         <Bush />
       </Bill>
     ));
-    // street cars: two parked, two in the lanes
+    // street cars and pickups: parked and in the lanes
     add("car1", streetPts, 0.15, 36, (a) => <IsoCar rot={a} />);
-    add("car2", streetPts, 0.57, 36, (a) => <IsoCar rot={a} />);
+    add("car2", streetPts, 0.57, 36, (a) => <IsoPickup rot={a} />);
     add("car3", streetPts, 0.36, -13, (a) => <IsoCar rot={a} />);
     add("car4", streetPts, 0.8, 13, (a) => <IsoCar rot={a + Math.PI} />);
-    // driveway cars; the middle one noses across the walk
+    // driveway vehicles; the middle one noses across the walk
     add("dcar1", pts, 0.13, -66, (a) => <IsoCar rot={a + Math.PI / 2} />);
     add("dcar2", pts, 0.47, -8, (a) => <IsoCar rot={a + Math.PI / 2} />);
-    add("dcar3", pts, 0.76, -60, (a) => <IsoCar rot={a - Math.PI / 2} />);
-    // barricades at both ends of the never-built gap
-    add("barA", pts, GAP[0] - 0.004, 0, () => (
-      <Bill>
-        <IsoBarricade id="nb-near" />
-      </Bill>
-    ));
-    add("barB", pts, GAP[1] + 0.004, 0, () => (
-      <Bill>
-        <IsoBarricade id="nb-far" />
-      </Bill>
-    ));
+    add("dcar3", pts, 0.76, -60, (a) => <IsoPickup rot={a - Math.PI / 2} />);
+    // barricades at both ends of each never-built stretch
+    GAPS.forEach(([g1, g2], gi) => {
+      add(`barA${gi}`, pts, g1 - 0.004, 0, () => (
+        <Bill>
+          <IsoBarricade id={`nb${gi}-near`} />
+        </Bill>
+      ));
+      add(`barB${gi}`, pts, g2 + 0.004, 0, () => (
+        <Bill>
+          <IsoBarricade id={`nb${gi}-far`} />
+        </Bill>
+      ));
+    });
     // weeds through the seams, and in the gap's dirt
     WEEDS.forEach(([f, side, s], i) =>
       add(`w${i}`, pts, f, side * 23, () => (
@@ -628,12 +708,13 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
         </Bill>
       )),
     );
-    ([[0.167, -13, 1.15], [0.176, 11, 0.9], [0.186, -11, 1.05], [0.195, 12, 0.8]] as const).forEach(([f, d, s], i) =>
-      add(`gw${i}`, pts, f, d, () => (
-        <Bill>
-          <Weed s={s} />
-        </Bill>
-      )),
+    ([[0.167, -13, 1.15], [0.176, 11, 0.9], [0.186, -11, 1.05], [0.195, 12, 0.8], [0.831, -12, 0.95], [0.84, 11, 0.85]] as const).forEach(
+      ([f, d, s], i) =>
+        add(`gw${i}`, pts, f, d, () => (
+          <Bill>
+            <Weed s={s} />
+          </Bill>
+        )),
     );
     // the fallen walker, mid-tumble beside the heaved panel
     add("walker", pts, 0.634, -(RIBBON / 2 + 30), () => (
@@ -665,14 +746,6 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
         </text>
       </Bill>
     ));
-    add("utTower", pts, 0.93, 216, () => (
-      <Bill>
-        <UtTowerBill />
-        <text y="18" textAnchor="middle" fontSize="12" fill="var(--ink-mute)" fontFamily="var(--font-mono)">
-          ut tower
-        </text>
-      </Bill>
-    ));
     add("bartonHouse", pts, 0.56, 252, () => <IsoBox w={30} d={12} h={10} rot={0} top="var(--field-2)" wall="var(--field-3)" lineW={1} />, -29, -28);
     ([[-30, 32, 16], [12, 38, 19], [52, 30, 14]] as const).forEach(([dx, dy, r], i) =>
       add(`bt${i}`, pts, 0.56, 252, () => (
@@ -691,10 +764,11 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
         <g transform={`translate(${box.w / 2} ${box.h * 0.62})`}>
           <g transform={ISO_M}>
             <motion.g style={{ x, y }}>
-              {/* lawns */}
-              <ellipse cx="180" cy="3620" rx="240" ry="420" fill="var(--olive-200)" opacity="0.14" />
-              <ellipse cx="1090" cy="2350" rx="260" ry="480" fill="var(--olive-200)" opacity="0.12" />
-              <ellipse cx="210" cy="1500" rx="220" ry="380" fill="var(--olive-200)" opacity="0.13" />
+              {/* the land itself: suburban lawns give way to downtown paving */}
+              <path d={subPath(pts, 0.01, 0.745, () => -152)} fill="none" stroke="var(--olive-200)" strokeWidth="120" strokeLinecap="butt" opacity="0.26" />
+              <path d={subPath(pts, 0.03, 0.735, () => 176)} fill="none" stroke="var(--olive-200)" strokeWidth="110" strokeLinecap="butt" opacity="0.2" />
+              <path d={subPath(pts, 0.765, 0.985, () => -142)} fill="none" stroke="var(--field-3)" strokeWidth="130" strokeLinecap="butt" opacity="0.45" />
+              <path d={subPath(pts, 0.77, 0.985, () => 168)} fill="none" stroke="var(--field-3)" strokeWidth="112" strokeLinecap="butt" opacity="0.4" />
 
               {/* driveways and front walks, under everything paved */}
               {driveways.map((s, i) => (
@@ -750,29 +824,34 @@ export function SidewalkWalk({ progress }: { progress: MotionValue<number> }) {
                 </Scene>
               ))}
 
-              {/* ---- never built: the ribbon stops for a curved stretch ---- */}
-              <path d={subPath(pts, GAP[0], GAP[1])} fill="none" stroke="var(--field)" strokeWidth={RIBBON + 11} strokeLinecap="butt" />
-              <path d={subPath(pts, GAP[0], GAP[1])} fill="none" stroke="var(--olive-100)" strokeWidth={RIBBON - 2} strokeLinecap="butt" opacity="0.28" />
-              {GAP.map((f) => {
-                const s = strip(f, -RIBBON / 2, RIBBON / 2);
-                return <line key={f} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="var(--line-strong)" strokeWidth="2.6" opacity="0.75" />;
-              })}
-              <path
-                d={subPath(pts, GAP[0] - 0.002, GAP[1] + 0.002, (i) => 8 * Math.sin(i * 0.85) + 3 * Math.sin(i * 2.1))}
-                fill="none"
-                stroke="var(--olive-700)"
-                strokeWidth="12"
-                strokeLinecap="round"
-                opacity="0.24"
-              />
-              <path
-                d={subPath(pts, GAP[0] - 0.002, GAP[1] + 0.002, (i) => 8 * Math.sin(i * 0.85) + 3 * Math.sin(i * 2.1))}
-                fill="none"
-                stroke="var(--olive-800)"
-                strokeWidth="2"
-                strokeDasharray="6 10"
-                opacity="0.35"
-              />
+              {/* ---- never built: the ribbon stops for curved stretches —
+                   the labeled suburban one, and a wordless one downtown ---- */}
+              {GAPS.map(([g1, g2], gi) => (
+                <g key={`gap${gi}`}>
+                  <path d={subPath(pts, g1, g2)} fill="none" stroke="var(--field)" strokeWidth={RIBBON + 11} strokeLinecap="butt" />
+                  <path d={subPath(pts, g1, g2)} fill="none" stroke="var(--olive-100)" strokeWidth={RIBBON - 2} strokeLinecap="butt" opacity="0.28" />
+                  {[g1, g2].map((f) => {
+                    const s = strip(f, -RIBBON / 2, RIBBON / 2);
+                    return <line key={f} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="var(--line-strong)" strokeWidth="2.6" opacity="0.75" />;
+                  })}
+                  <path
+                    d={subPath(pts, g1 - 0.002, g2 + 0.002, (i) => 8 * Math.sin(i * 0.85) + 3 * Math.sin(i * 2.1))}
+                    fill="none"
+                    stroke="var(--olive-700)"
+                    strokeWidth="12"
+                    strokeLinecap="round"
+                    opacity="0.24"
+                  />
+                  <path
+                    d={subPath(pts, g1 - 0.002, g2 + 0.002, (i) => 8 * Math.sin(i * 0.85) + 3 * Math.sin(i * 2.1))}
+                    fill="none"
+                    stroke="var(--olive-800)"
+                    strokeWidth="2"
+                    strokeDasharray="6 10"
+                    opacity="0.35"
+                  />
+                </g>
+              ))}
               {([[0.168, 6], [0.174, -9], [0.181, 8], [0.188, -6], [0.194, 5]] as const).map(([f, dd], i) => (
                 <Scene key={`pb${i}`} pts={pts} f={f} d={dd} rotate={false}>
                   <circle r="2.2" fill="var(--olive-700)" opacity="0.45" />

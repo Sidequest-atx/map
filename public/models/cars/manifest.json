@@ -1,0 +1,91 @@
+{
+  "generated": "2026-09-04",
+  "note": "All models sourced from poly.pizza with per-model license verified on the model page (license link scraped from page HTML). No game-ripped assets. CC0 models need no attribution; CC-BY models require the strings in attributionRequired to appear somewhere public on the site (e.g. an About/Credits page).",
+  "entries": [
+    {
+      "filename": "sedan.glb",
+      "slot": "1. Mid-size sedan (Accord-like)",
+      "modelName": "Car",
+      "author": "Quaternius",
+      "license": "CC0 1.0 Universal (Public Domain)",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sourcePage": "https://poly.pizza/m/unqqkULtRU",
+      "fileUrl": "https://static.poly.pizza/d35173c8-6078-4367-8f87-b1f2599f0bb7.glb",
+      "fileSizeBytes": 174320,
+      "realismScore": 4,
+      "notes": "Smooth-shaded 4-door compact sedan with realistic proportions, small rear spoiler; reads as a modern economy sedan from aerial view."
+    },
+    {
+      "filename": "suv-crossover.glb",
+      "slot": "2. Crossover SUV (Lexus RX-like)",
+      "modelName": "SUV",
+      "author": "Quaternius",
+      "license": "CC0 1.0 Universal (Public Domain)",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sourcePage": "https://poly.pizza/m/xsMtZhBkxL",
+      "fileUrl": "https://static.poly.pizza/e5fbf2ee-5c9e-47d5-8ab6-80cacd463baa.glb",
+      "fileSizeBytes": 181608,
+      "realismScore": 4,
+      "notes": "Smooth crossover with raked rear glass and roof rails; convincing RX-like silhouette from above."
+    },
+    {
+      "filename": "pickup.glb",
+      "slot": "3. Pickup truck (F-150-like)",
+      "modelName": "Mitsubishi L200",
+      "author": "Muhammad Reyhan",
+      "license": "CC BY 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+      "sourcePage": "https://poly.pizza/m/4qjS9tFhsJg",
+      "fileUrl": "https://static.poly.pizza/ecae441a-cba8-4dd6-9795-207a72d7e88e.glb",
+      "fileSizeBytes": 192800,
+      "realismScore": 5,
+      "notes": "Realistic crew-cab pickup (4 doors + bed) modeled on a real truck; dark body with silver lower cladding and hood scoop. Alternate rejected: Toyota Hilux 97 by same author (single cab, https://poly.pizza/m/8-0nFArehjd, CC BY 3.0) - crew cab reads more modern."
+    },
+    {
+      "filename": "suv-large.glb",
+      "slot": "4. Plain large SUV to re-livery (Explorer-like)",
+      "modelName": "Terrano",
+      "author": "Muhammad Reyhan",
+      "license": "CC BY 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+      "sourcePage": "https://poly.pizza/m/fWGNi96ckzn",
+      "fileUrl": "https://static.poly.pizza/fe18e8b7-852a-425c-9b4b-a2b25dc191b7.glb",
+      "fileSizeBytes": 179840,
+      "realismScore": 5,
+      "notes": "Realistic boxy body-on-frame SUV (Nissan Terrano) in plain blue, no markings - good blank canvas for a police re-livery. Police-specific alternates on poly.pizza were sedans or too cartoony (Quaternius Police Car /m/BwwnUrWGmV is a decent CC0 sedan cruiser if ever needed)."
+    },
+    {
+      "filename": "bus.glb",
+      "slot": "5. City bus (optional)",
+      "modelName": "Montreal Bus",
+      "author": "Nick Ladd",
+      "license": "CC BY 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+      "sourcePage": "https://poly.pizza/m/fFCCghvRImG",
+      "fileUrl": "https://static.poly.pizza/acc9ab7a-ed54-4c1c-adb1-f5fe161eebd5.glb",
+      "fileSizeBytes": 389620,
+      "realismScore": 5,
+      "notes": "Very realistic modern low-floor transit bus (Nova Bus LFS style). Carries an STM (Montreal transit) chevron livery baked into the model - consider recoloring/retexturing to a neutral or CapMetro-ish livery before shipping."
+    },
+    {
+      "filename": "cybertruck.glb",
+      "slot": "6. Cybertruck-like angular truck (optional)",
+      "modelName": "Cybertruck",
+      "author": "Mobolaji",
+      "license": "CC BY 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+      "sourcePage": "https://poly.pizza/m/Jpar3f32mt",
+      "fileUrl": "https://static.poly.pizza/bd53628e-9ef8-4809-a8e1-8aa680186d0f.glb",
+      "fileSizeBytes": 1001352,
+      "realismScore": 4,
+      "notes": "Clean angular stainless-look Cybertruck silhouette with tonneau texture. Fan-made original mesh (not game-ripped). Largest file of the set at ~1.0 MB."
+    }
+  ],
+  "attributionRequired": [
+    "Mitsubishi L200 by Muhammad Reyhan [CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/)] via Poly Pizza (https://poly.pizza/m/4qjS9tFhsJg)",
+    "Terrano by Muhammad Reyhan [CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/)] via Poly Pizza (https://poly.pizza/m/fWGNi96ckzn)",
+    "Montreal Bus by Nick Ladd [CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/)] via Poly Pizza (https://poly.pizza/m/fFCCghvRImG)",
+    "Cybertruck by Mobolaji [CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/)] via Poly Pizza (https://poly.pizza/m/Jpar3f32mt)"
+  ],
+  "unfilled": []
+}

@@ -2,18 +2,21 @@ import { useEffect, useRef } from "react";
 import type { MotionValue } from "motion/react";
 import { useMotionValueEvent, useReducedMotion } from "motion/react";
 import { useReports } from "../data/store";
-import { MAP_STYLE, mapboxgl, NW_AUSTIN, SEVERITY_COLORS, tintMap } from "../lib/mapbox";
+import { MAP_STYLE, mapboxgl, SEVERITY_COLORS, tintMap } from "../lib/mapbox";
 
 /**
- * The finale's camera: a live map whose view is scrubbed by scroll, diving
- * from all of Austin down into the neighborhood — the reader scrolls INTO the
- * map. Non-interactive (the page scroll owns the gesture); the overlay hands
- * off to /map for the real thing. Under reduced motion the camera just sits
- * at the destination.
+ * The finale's camera, second half of the 3D handoff: the map opens exactly
+ * where the risen 3D camera left off — close over the neighborhood, north-up,
+ * flat — and pulls BACK to all of Austin as the reader keeps scrolling, so
+ * the scale of the problem lands with the dots. Non-interactive (the page
+ * scroll owns the gesture); the overlay hands off to /map for the real thing.
+ * Under reduced motion the camera just sits at the wide resting view.
  */
-const CITY: [number, number] = [-97.743, 30.31]; // Austin, wide
-const CITY_ZOOM = 9.3;
-const HOME_ZOOM = 12.6;
+const CITY: [number, number] = [-97.743, 30.29]; // Austin, wide — lake, grid, I-35
+const CITY_ZOOM = 9.6;
+/** The real Texas Capitol: the map opens exactly where the 3D walk ended. */
+const CAPITOL_LL: [number, number] = [-97.7404, 30.2747];
+const CAPITOL_ZOOM = 13.7;
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
@@ -33,13 +36,15 @@ export default function DiveMap({ progress, onFail }: { progress: MotionValue<nu
   const applyCamera = (p: number) => {
     const m = mapRef.current;
     if (!m || !readyRef.current) return;
-    // The dive runs over the first 85% of the finale; the last stretch holds.
-    const t = easeInOut(Math.min(Math.max(p / 0.85, 0), 1));
+    // Hold the close, north-up Capitol framing while the 3D canvas fades
+    // over the map (p ≲ 0.55), then pull back until all of Austin — the
+    // lake, the grid, the highways — sits under the count.
+    const t = easeInOut(Math.min(Math.max((p - 0.52) / 0.4, 0), 1));
     m.jumpTo({
-      center: [lerp(CITY[0], NW_AUSTIN[0], t), lerp(CITY[1], NW_AUSTIN[1], t)],
-      zoom: lerp(CITY_ZOOM, HOME_ZOOM, t),
-      pitch: t < 0.6 ? 0 : lerp(0, 32, (t - 0.6) / 0.4),
-      bearing: lerp(-8, 0, t),
+      center: [lerp(CAPITOL_LL[0], CITY[0], t), lerp(CAPITOL_LL[1], CITY[1], t)],
+      zoom: lerp(CAPITOL_ZOOM, CITY_ZOOM, t),
+      pitch: 0,
+      bearing: 0,
     });
   };
 
@@ -65,9 +70,9 @@ export default function DiveMap({ progress, onFail }: { progress: MotionValue<nu
         map = new mapboxgl.Map({
           container,
           style: MAP_STYLE,
-          center: reduced ? NW_AUSTIN : CITY,
-          zoom: reduced ? HOME_ZOOM : CITY_ZOOM,
-          bearing: reduced ? 0 : -8,
+          center: reduced ? CITY : CAPITOL_LL,
+          zoom: reduced ? CITY_ZOOM : CAPITOL_ZOOM,
+          bearing: 0,
           interactive: false,
           attributionControl: true,
         });

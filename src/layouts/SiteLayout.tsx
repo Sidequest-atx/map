@@ -111,6 +111,16 @@ export function SiteLayout() {
               <span>© {new Date().getFullYear()} SideQuest ATX. Reports are public data, CC BY 4.0.</span>
               <span>Photos of public sidewalks. No faces, no plates, no addresses published.</span>
             </div>
+            <div className="footer-bottom" style={{ marginTop: "0.4rem" }}>
+              <span>
+                3D street vehicles:{" "}
+                <a href="https://poly.pizza/m/4qjS9tFhsJg" rel="noopener" target="_blank">Mitsubishi L200</a> and{" "}
+                <a href="https://poly.pizza/m/fWGNi96ckzn" rel="noopener" target="_blank">Terrano</a> by Muhammad Reyhan,{" "}
+                <a href="https://poly.pizza/m/fFCCghvRImG" rel="noopener" target="_blank">Montreal Bus</a> by Nick Ladd,{" "}
+                <a href="https://poly.pizza/m/Jpar3f32mt" rel="noopener" target="_blank">Cybertruck</a> by Mobolaji (all CC BY 3.0, via
+                Poly Pizza); sedan and SUV by Quaternius (CC0).
+              </span>
+            </div>
           </div>
         </footer>
       )}

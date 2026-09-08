@@ -1,11 +1,11 @@
-﻿import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+﻿import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link } from "react-router-dom";
-import { motion, useMotionValueEvent, useReducedMotion, useScroll } from "motion/react";
+import { motion, useAnimationFrame, useMotionValueEvent, useReducedMotion, useScroll, type MotionValue } from "motion/react";
 import { CountUp } from "../components/CountUp";
 import DiveMap from "../components/DiveMap";
 import { FallTicker } from "../components/FallTicker";
 import { Motif } from "../components/Motif";
-import { SidewalkWalk } from "../components/SidewalkWalk";
+import { WalkExperience } from "../walk";
 import { useReports } from "../data/store";
 import { fmtInt } from "../lib/format";
 import { staticMapUrl, useMapboxToken } from "../lib/mapbox";
@@ -67,6 +67,49 @@ export default function Mission() {
   const storyRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress: walkProgress } = useScroll({ target: storyRef, offset: ["start 0.65", "end 0.92"] });
 
+  // The drone prologue. Auto mode (default): the flyover plays on the clock
+  // over the prologue viewport and scroll owns only the descent (the
+  // prologue's exit). Scrub mode (?scrub=1): the prologue is a tall sticky
+  // track and scroll owns every beat. Both are built — James decides.
+  const scrub = useMemo(() => typeof location !== "undefined" && location.search.includes("scrub"), []);
+  const prologueRef = useRef<HTMLElement>(null);
+  const { scrollYProgress: prologueScroll } = useScroll({
+    target: prologueRef,
+    offset: scrub ? ["start start", "end end"] : ["start start", "end 0.75"],
+  });
+  // Mobile mounts one WebGL instance at a time: full-bleed behind the
+  // prologue copy, then the classic sticky strip once the story begins.
+  const [mobileStage, setMobileStage] = useState<"prologue" | "story">("prologue");
+  useMotionValueEvent(prologueScroll, "change", (v) => {
+    setMobileStage((s) => (v > 0.985 ? "story" : v < 0.7 ? "prologue" : s));
+  });
+
+  // The finale's scroll drives the camera rise, the canvas-to-map crossfade,
+  // and the map's pull-back — one timeline, owned here.
+  const finaleRef = useRef<HTMLElement>(null);
+  const { scrollYProgress: finaleScroll } = useScroll({ target: finaleRef, offset: ["start end", "end end"] });
+  // The canvas-to-map crossfade, written imperatively each frame — the
+  // subscription path proved unreliable for this value, polling is not.
+  const canvasLayerRef = useRef<HTMLDivElement>(null);
+  useAnimationFrame(() => {
+    const el = canvasLayerRef.current;
+    if (!el) return;
+    const v = finaleScroll.get();
+    const o = v <= 0.55 ? 1 : v >= 0.85 ? 0 : 1 - (v - 0.55) / 0.3;
+    el.style.opacity = o.toFixed(3);
+    el.style.visibility = o < 0.01 ? "hidden" : "visible";
+  });
+
+  // One WebGL context: the canvas mounts either as the desktop full-bleed
+  // layer or inside the mobile strip, never both.
+  const [desktop, setDesktop] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(min-width: 1024px)").matches);
+  useEffect(() => {
+    const mq = matchMedia("(min-width: 1024px)");
+    const on = () => setDesktop(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+
   // Mount the live dive map a beat before the reader reaches it.
   const [mapArmed, setMapArmed] = useState(false);
   useEffect(() => {
@@ -91,50 +134,79 @@ export default function Mission() {
     <>
       <ChapterRail active={active} reduced={reduced} />
 
-      {/* ---- Prologue: the question nobody can answer ---- */}
-      <section
-        id="prologue"
-        className="has-motif relative grid min-h-[calc(100dvh-var(--topbar-h))] content-center overflow-hidden bg-olive-900 text-ink-on-dark"
-      >
-        <Motif kind="crack" opacity={0.14} style={{ color: "var(--olive-400)" }} />
-        <div className="wrap pb-16">
-          <p className="font-sans text-[11px] font-semibold tracking-[0.14em] text-ink-on-dark-soft uppercase">
-            SideQuest ATX · Northwest Austin
-          </p>
-          <h1 className="mt-4 max-w-3xl font-serif text-[clamp(2.2rem,4.8vw,3.5rem)] leading-[1.08] font-bold tracking-[-0.02em] text-balance">
-            Austin knows its sidewalks by the mile. Nobody knows them by the panel.
-          </h1>
-          <Rise delay={0.6}>
-            <p className="mt-6 font-serif text-[clamp(1.4rem,2.6vw,2rem)] italic">
-              And everything that matters happens on a panel.
+      {/* ---- Prologue: the drone's Austin, with the question nobody can
+              answer over it. The 3D flyover plays behind this copy; a scrim
+              keeps the words readable over a daylight sky. ---- */}
+      <section ref={prologueRef} id="prologue" className={scrub ? "has-motif relative z-10 h-[400vh]" : "has-motif relative z-10"}>
+        <div
+          className={
+            "relative grid content-center overflow-hidden text-ink-on-dark " +
+            (scrub
+              ? "sticky top-[var(--topbar-h)] h-[calc(100dvh-var(--topbar-h))]"
+              : "min-h-[calc(100dvh-var(--topbar-h))]")
+          }
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-olive-900/85 via-olive-900/45 to-olive-900/5" aria-hidden />
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-olive-900/55 to-transparent" aria-hidden />
+          <Motif kind="crack" opacity={0.1} style={{ color: "var(--olive-400)" }} />
+          <div className="wrap relative pb-16">
+            <p className="font-sans text-[11px] font-semibold tracking-[0.14em] text-ink-on-dark-soft uppercase">
+              SideQuest ATX · Northwest Austin
             </p>
-          </Rise>
-          <Rise delay={1.1}>
-            <p className="mt-5 max-w-xl font-sans text-[0.95rem] leading-relaxed text-ink-on-dark-soft">
-              The City can price the entire fix and still can't name the slab that breaks the next hip. This page is
-              one walk down that gap. Every number on it is the City's, the CDC's, or a federal court's.
-            </p>
-          </Rise>
-        </div>
-        <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2" aria-hidden>
-          <span className="font-sans text-[10px] tracking-[0.2em] text-ink-on-dark-soft uppercase">Scroll</span>
-          <motion.span
-            className="block h-9 w-px origin-top bg-ink-on-dark-soft/70"
-            animate={reduced ? undefined : { scaleY: [0.15, 1, 0.15] }}
-            transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
-          />
+            <h1 className="mt-4 max-w-3xl font-serif text-[clamp(2.2rem,4.8vw,3.5rem)] leading-[1.08] font-bold tracking-[-0.02em] text-balance">
+              Austin knows its sidewalks by the mile. Nobody knows them by the panel.
+            </h1>
+            <Rise delay={0.6}>
+              <p className="mt-6 font-serif text-[clamp(1.4rem,2.6vw,2rem)] italic">
+                And everything that matters happens on a panel.
+              </p>
+            </Rise>
+            <Rise delay={1.1}>
+              <p className="mt-5 max-w-xl font-sans text-[0.95rem] leading-relaxed text-ink-on-dark-soft">
+                The City can price the entire fix and still can't name the slab that breaks the next hip. This page is
+                one walk down that gap. Every number on it is the City's, the CDC's, or a federal court's.
+              </p>
+            </Rise>
+          </div>
+          <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2" aria-hidden>
+            <span className="font-sans text-[10px] tracking-[0.2em] text-ink-on-dark-soft uppercase">Scroll</span>
+            <motion.span
+              className="block h-9 w-px origin-top bg-ink-on-dark-soft/70"
+              animate={reduced ? undefined : { scaleY: [0.15, 1, 0.15] }}
+              transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
+            />
+          </div>
         </div>
       </section>
 
-      {/* ---- The story, in the portal's frame: the walk fills the screen,
-              the narrative takes its panel. ---- */}
-      <div ref={storyRef} className="relative lg:flex">
-        <div className="sticky top-[var(--topbar-h)] z-10 h-[34dvh] min-w-0 border-b border-line lg:static lg:z-auto lg:h-auto lg:flex-1 lg:border-b-0">
-          <div className="h-full lg:sticky lg:top-[var(--topbar-h)] lg:h-[calc(100dvh-var(--topbar-h))]">
-            <SidewalkWalk progress={walkProgress} />
-          </div>
+      {/* ---- The story: the 3D walk fills the screen behind the narrative
+              panel. On desktop the canvas is a fixed full-viewport layer (so
+              the finale can fade it into the map); on mobile it lives in the
+              sticky strip. ---- */}
+      {(desktop || mobileStage === "prologue") && (
+        <div
+          ref={desktop ? canvasLayerRef : undefined}
+          className="pointer-events-none fixed inset-x-0 top-[var(--topbar-h)] bottom-0 z-[5]"
+          aria-hidden
+        >
+          <WalkExperience
+            walk={walkProgress}
+            finaleScroll={finaleScroll}
+            layout="fixed"
+            prologue={prologueScroll}
+            prologueMode={scrub ? "scrub" : "auto"}
+          />
         </div>
-        <div className="border-line bg-surface px-5 sm:px-8 lg:w-[38%] lg:shrink-0 lg:border-l lg:px-10">
+      )}
+      <div ref={storyRef} className="relative lg:flex">
+        <div className="sticky top-[var(--topbar-h)] z-20 h-[34dvh] min-w-0 border-b border-line bg-field-2 lg:static lg:z-auto lg:h-auto lg:flex-1 lg:border-b-0 lg:bg-transparent">
+          {!desktop && mobileStage === "story" && (
+            <div className="h-full">
+              <WalkExperience walk={walkProgress} finaleScroll={finaleScroll} layout="strip" />
+            </div>
+          )}
+        </div>
+        <div className="relative z-10 border-line bg-surface px-5 sm:px-8 lg:w-[38%] lg:shrink-0 lg:border-l lg:px-10">
           <Chapter id="missing">
             <Claim>Austin doesn't have a sidewalk network. It has 2,800 miles of fragments.</Claim>
             <Rise delay={0.1}>
@@ -341,7 +413,7 @@ export default function Mission() {
       </div>
 
       {/* ---- Finale: the scroll dives into the map ---- */}
-      <MapFinale armed={mapArmed} live={live} mapUrl={mapUrl} />
+      <MapFinale armed={mapArmed} live={live} mapUrl={mapUrl} sectionRef={finaleRef} progress={finaleScroll} />
     </>
   );
 }
@@ -444,24 +516,26 @@ function MapFinale({
   armed,
   live,
   mapUrl,
+  sectionRef,
+  progress,
 }: {
   armed: boolean;
   live: { total: number; open: number; fixed: number };
   mapUrl: string | null;
+  sectionRef: RefObject<HTMLElement | null>;
+  progress: MotionValue<number>;
 }) {
-  const ref = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end end"] });
   const [engaged, setEngaged] = useState(false);
-  useMotionValueEvent(scrollYProgress, "change", (v) => setEngaged(v > 0.72));
+  useMotionValueEvent(progress, "change", (v) => setEngaged(v > 0.72));
   const [failed, setFailed] = useState(false);
   const { token } = useMapboxToken();
   const liveMap = armed && Boolean(token) && !failed;
 
   return (
-    <section ref={ref} id="finale" className="relative h-[300vh] bg-field">
+    <section ref={sectionRef} id="finale" className="relative h-[300vh] bg-field">
       <div className="sticky top-0 h-dvh overflow-hidden bg-field-2">
         {liveMap ? (
-          <DiveMap progress={scrollYProgress} onFail={() => setFailed(true)} />
+          <DiveMap progress={progress} onFail={() => setFailed(true)} />
         ) : mapUrl ? (
           <img src={mapUrl} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover" />
         ) : (

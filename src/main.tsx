@@ -14,12 +14,15 @@ const Data = lazy(() => import("./pages/Data"));
 const GetApp = lazy(() => import("./pages/GetApp"));
 const SignIn = lazy(() => import("./pages/app/SignIn"));
 const Portal = lazy(() => import("./pages/Portal"));
+// DEV ONLY — 3D walk harness, excluded from prod builds.
+const WalkDev = import.meta.env.DEV ? lazy(() => import("./pages/WalkDev")) : null;
 
 const S = (el: React.ReactNode) => <Suspense fallback={<PageLoading />}>{el}</Suspense>;
 
 // Photos are captured in the iPhone app only; the website is the public map
 // and the moderator portal. Old /app/report and /app/drive links land on /app.
 const router = createBrowserRouter([
+  ...(WalkDev ? [{ path: "/walkdev", element: S(<WalkDev />) }] : []),
   {
     element: <SiteLayout />,
     children: [

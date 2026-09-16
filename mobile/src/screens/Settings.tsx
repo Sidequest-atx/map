@@ -1,19 +1,41 @@
 import * as Application from "expo-application";
 import Constants from "expo-constants";
 import React, { useEffect, useState } from "react";
-import { Alert, Switch, Text, View } from "react-native";
+import { Alert, Pressable, Switch, Text, View } from "react-native";
 import { classifierName } from "../ai/classify";
 import { photosDirStats } from "../data/fs";
 import { setPrefs, signOut, usePrefs, useSession } from "../data/session";
 import { useReports } from "../data/store";
-import { syncNow, useSyncStatus } from "../data/sync";
+import { getSyncStatus, syncNow, useSyncStatus } from "../data/sync";
 import { shareCsv, shareGeoJSON } from "../lib/export";
+import { friendlySyncError } from "../lib/friendlyError";
 import { ALBUM_NAME } from "../lib/photos";
 import type { ScreenProps } from "../nav";
 import { shortDateTime } from "../lib/format";
-import { C, SP } from "../theme";
+import { C, SP, T } from "../theme";
 import { ROLE_LABELS } from "../types";
 import { Button, Card, Divider, H2, Notice, P, Row, Screen, Segmented, Small, Stack } from "../ui";
+
+/** Before signing out, say what hasn't uploaded yet and offer to upload it first. */
+export function confirmSignOut() {
+  const n = getSyncStatus().pending;
+  if (n > 0) {
+    Alert.alert(
+      "Sign out?",
+      `${n} report${n === 1 ? " hasn't" : "s haven't"} reached the shared map yet. ${n === 1 ? "It stays" : "They stay"} on this phone and upload the next time you sign in.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Upload first", onPress: () => void syncNow() },
+        { text: "Sign out", style: "destructive", onPress: signOut },
+      ],
+    );
+    return;
+  }
+  Alert.alert("Sign out?", "Your reports are all on the shared map, and they stay on this phone too.", [
+    { text: "Cancel", style: "cancel" },
+    { text: "Sign out", style: "destructive", onPress: signOut },
+  ]);
+}
 
 export function SettingsScreen(_: ScreenProps<"Settings">) {
   const session = useSession();
@@ -21,6 +43,7 @@ export function SettingsScreen(_: ScreenProps<"Settings">) {
   const reports = useReports();
   const sync = useSyncStatus();
   const [stats, setStats] = useState({ files: 0, bytes: 0 });
+  const [showDetails, setShowDetails] = useState(false);
   useEffect(() => {
     setStats(photosDirStats());
   }, [reports.length]);
@@ -44,17 +67,35 @@ export function SettingsScreen(_: ScreenProps<"Settings">) {
             {session?.name} · {session ? ROLE_LABELS[session.role] : ""}
           </P>
           {session?.email ? <Small>{session.email}</Small> : null}
-          <Button title="Sign out" size="sm" onPress={() => Alert.alert("Sign out?", "Reports stay on this phone; anything not yet uploaded waits until you sign back in.", [{ text: "Cancel", style: "cancel" }, { text: "Sign out", style: "destructive", onPress: signOut }])} />
+          <Button title="Sign out" size="sm" onPress={confirmSignOut} />
         </Card>
 
         <Card>
           <H2>Shared map</H2>
           <Small>
             {sync.pending === 0
-              ? `Everything on this phone is on the shared map.${sync.lastSyncAt ? ` Last checked ${shortDateTime(sync.lastSyncAt)}.` : ""}`
+              ? `Everything from this account is on the shared map.${sync.lastSyncAt ? ` Last checked ${shortDateTime(sync.lastSyncAt)}.` : ""}`
               : `${sync.pending} change${sync.pending === 1 ? "" : "s"} waiting to upload.`}
           </Small>
-          {sync.lastError ? <Notice tone="warn">Last attempt failed: {sync.lastError}</Notice> : null}
+          {sync.waitingForOthers > 0 ? (
+            <Small>
+              {sync.waitingForOthers} report{sync.waitingForOthers === 1 ? "" : "s"} on this phone {sync.waitingForOthers === 1 ? "was" : "were"} captured under another account.{" "}
+              {sync.waitingForOthers === 1 ? "It uploads" : "They upload"} when that person signs in.
+            </Small>
+          ) : null}
+          {sync.lastError ? (
+            <Notice tone="warn">
+              <P>{friendlySyncError(sync.lastError)}</P>
+              <Pressable onPress={() => setShowDetails((v) => !v)} accessibilityRole="button" hitSlop={12}>
+                <Small style={{ color: C.olive800, fontWeight: "600" }}>{showDetails ? "Hide details" : "Details"}</Small>
+              </Pressable>
+              {showDetails ? (
+                <Text selectable style={T.mono}>
+                  {sync.lastError}
+                </Text>
+              ) : null}
+            </Notice>
+          ) : null}
           <Row>
             <Button title={sync.running ? "Syncing…" : "Sync now"} variant="primary" size="sm" loading={sync.running} onPress={() => void syncNow()} />
           </Row>
@@ -87,9 +128,9 @@ export function SettingsScreen(_: ScreenProps<"Settings">) {
               <Small>Leave at 0 unless Glasses Walk pins land consistently early or late.</Small>
             </View>
             <Row gap={4}>
-              <Button title="−5" size="sm" onPress={() => setPrefs({ glassesClockOffsetS: prefs.glassesClockOffsetS - 5 })} />
+              <Button title="−5" size="sm" accessibilityLabel="Minus 5 seconds" onPress={() => setPrefs({ glassesClockOffsetS: prefs.glassesClockOffsetS - 5 })} />
               <Text style={{ minWidth: 44, textAlign: "center", fontWeight: "700", fontVariant: ["tabular-nums"] }}>{prefs.glassesClockOffsetS}s</Text>
-              <Button title="+5" size="sm" onPress={() => setPrefs({ glassesClockOffsetS: prefs.glassesClockOffsetS + 5 })} />
+              <Button title="+5" size="sm" accessibilityLabel="Plus 5 seconds" onPress={() => setPrefs({ glassesClockOffsetS: prefs.glassesClockOffsetS + 5 })} />
             </Row>
           </Row>
         </Card>

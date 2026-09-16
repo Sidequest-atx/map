@@ -1,5 +1,6 @@
 import * as Location from "expo-location";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 import { nearestNeighborhood, nearestPlace } from "../data/places";
 import type { LngLat } from "./geo";
 
@@ -30,6 +31,8 @@ export interface LiveGps {
   status: FixStatus;
   /** true when the OS is handing us coarse ~1 km fixes (Precise Location off) */
   reducedAccuracy: boolean;
+  /** false once iOS stops showing the permission prompt: only Settings can turn location back on */
+  canAskAgain: boolean;
   error: string | null;
   snapshot: () => { fix: LiveFix; headingDeg: number | null } | null;
   retry: () => void;
@@ -39,13 +42,20 @@ export function useLiveGps(active: boolean): LiveGps {
   const [fix, setFix] = useState<LiveFix | null>(null);
   const [best, setBest] = useState<LiveFix | null>(null);
   const [headingDeg, setHeading] = useState<number | null>(null);
-  const [status, setStatus] = useState<FixStatus>("idle");
+  const [status, setStatusState] = useState<FixStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [reduced, setReduced] = useState(false);
+  const [canAskAgain, setCanAskAgain] = useState(true);
   const [nonce, setNonce] = useState(0);
   const fixRef = useRef<LiveFix | null>(null);
   const bestRef = useRef<LiveFix | null>(null);
   const headingRef = useRef<number | null>(null);
+  const statusRef = useRef<FixStatus>("idle");
+
+  const setStatus = useCallback((s: FixStatus) => {
+    statusRef.current = s;
+    setStatusState(s);
+  }, []);
 
   useEffect(() => {
     if (!active) return;
@@ -58,9 +68,14 @@ export function useLiveGps(active: boolean): LiveGps {
       setError(null);
       const perm = await Location.requestForegroundPermissionsAsync();
       if (cancelled) return;
+      setCanAskAgain(perm.canAskAgain);
       if (!perm.granted) {
         setStatus("denied");
-        setError("Location permission is off. Enable it in Settings so pins land on the right panel.");
+        setError(
+          perm.canAskAgain
+            ? "Location is off. Allow it so pins land on the right panel."
+            : "Location is off for SideQuest. Turn it on in Settings so pins land on the right panel.",
+        );
         return;
       }
       setStatus("searching");
@@ -107,7 +122,16 @@ export function useLiveGps(active: boolean): LiveGps {
       posSub?.remove();
       headSub?.remove();
     };
-  }, [active, nonce]);
+  }, [active, nonce, setStatus]);
+
+  // Coming back from the Settings app with location switched on: start over.
+  useEffect(() => {
+    if (!active) return;
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active" && statusRef.current === "denied") setNonce((n) => n + 1);
+    });
+    return () => sub.remove();
+  }, [active]);
 
   const snapshot = useCallback(() => {
     const now = Date.now();
@@ -120,7 +144,7 @@ export function useLiveGps(active: boolean): LiveGps {
 
   const retry = useCallback(() => setNonce((n) => n + 1), []);
 
-  return { fix, best, headingDeg, status, reducedAccuracy: reduced, error, snapshot, retry };
+  return { fix, best, headingDeg, status, reducedAccuracy: reduced, canAskAgain, error, snapshot, retry };
 }
 
 /** One-shot fix for flows that do not keep the watcher open (e.g. a picked photo without EXIF). */

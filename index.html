@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#37412a" />
+    <meta name="theme-color" content="#3d4b26" />
     <meta
       name="description"
       content="SideQuest ATX photographs every broken, blocked, or missing sidewalk in Austin, turns the photos into a living public map, and tracks each hazard until it is actually fixed."
@@ -11,21 +11,36 @@
     <meta property="og:title" content="SideQuest ATX" />
     <meta property="og:description" content="Map every broken sidewalk in Austin. Track each one until it is fixed." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/og.png" />
+    <meta property="og:url" content="https://sidequest-atx.vercel.app/" />
+    <meta property="og:image" content="https://sidequest-atx.vercel.app/og.png" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="SideQuest" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Overpass:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=Overpass+Mono:wght@400;600&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Fonts are self-hosted (src/styles/fonts.css, public/fonts). The
+         face rules ride in the site's own stylesheet, so the text still
+         never paints in a fallback and reflows (loading the old Google
+         sheet async measured CLS 0.28). The body face is fetched early. -->
+    <link rel="preload" href="/fonts/libre-franklin-normal-latin.woff2" as="font" type="font/woff2" crossorigin />
     <title>SideQuest ATX</title>
+    <script>
+      // The landing's first frame is the hero poster (its largest paint), but
+      // React only asks for it after the app script runs. Start it now, on the
+      // landing only, so other routes don't pay for an image they never show.
+      if (location.pathname === "/") {
+        var l = document.createElement("link");
+        l.rel = "preload";
+        l.as = "image";
+        l.href = "/media/hero-poster.webp";
+        l.setAttribute("fetchpriority", "high");
+        document.head.appendChild(l);
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

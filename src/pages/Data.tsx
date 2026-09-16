@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { priorityLabel, rankReport } from "../ai/rank";
 import { DemoBadge, SevBadge } from "../components/Bits";
 import { Download } from "../components/Icons";
-import { Motif } from "../components/Motif";
 import { NEIGHBORHOODS, NETWORK_MILES } from "../data/places";
 import { useDrives, useReports } from "../data/store";
 import { exportCsv, exportGeoJSON } from "../lib/export";
@@ -70,8 +69,7 @@ export default function Data() {
 
   return (
     <>
-      <section className="section has-motif">
-        <Motif kind="branch" opacity={0.12} style={{ color: "var(--olive-800)" }} />
+      <section className="section">
         <div className="wrap split">
           <div className="stack">
             <h1 className="h1">Open data.</h1>
@@ -122,7 +120,7 @@ export default function Data() {
 
         <div className="charts">
           <div className="chart">
-            <h3>Hazards by type</h3>
+            <h2 className="chart-h">Hazards by type</h2>
             <div className="bars">
               {m.byType.map((x) => (
                 <div key={x.t} className="bar-row">
@@ -138,7 +136,7 @@ export default function Data() {
           </div>
 
           <div className="chart">
-            <h3>Ticket life cycle</h3>
+            <h2 className="chart-h">Ticket life cycle</h2>
             <div className="funnel">
               {m.funnel.map((f) => (
                 <div key={f.s}>
@@ -152,7 +150,7 @@ export default function Data() {
           </div>
 
           <div className="chart">
-            <h3>By neighborhood: open vs resolved</h3>
+            <h2 className="chart-h">By neighborhood: open vs resolved</h2>
             <div className="bars">
               {m.byHood.map((x) => (
                 <div key={x.h} className="bar-row">
@@ -173,7 +171,7 @@ export default function Data() {
           </div>
 
           <div className="chart">
-            <h3>Median days to resolution, by neighborhood</h3>
+            <h2 className="chart-h">Median days to resolution, by neighborhood</h2>
             <div className="bars">
               {m.byHood.map((x) => (
                 <div key={x.h} className="bar-row">
@@ -190,7 +188,7 @@ export default function Data() {
         </div>
 
         <div className="chart">
-          <h3>Coverage: audited miles against the network</h3>
+          <h2 className="chart-h">Coverage: audited miles against the network</h2>
           <div className="bars">
             {m.byHood.map((x) => (
               <div key={x.h} className="bar-row">
@@ -252,7 +250,7 @@ export default function Data() {
                 <br />
                 <span>One row per report with priority score and 311 ticket.</span>
               </div>
-              <button className="btn" onClick={() => exportCsv(reports.filter((r) => !r.duplicateOf))}>
+              <button className="btn" aria-label="Download all reports as CSV" onClick={() => exportCsv(reports.filter((r) => !r.duplicateOf))}>
                 <Download style={{ width: 18, height: 18 }} /> CSV
               </button>
             </li>
@@ -262,7 +260,7 @@ export default function Data() {
                 <br />
                 <span>Point features, loads directly into QGIS, ArcGIS, or the City's tools.</span>
               </div>
-              <button className="btn" onClick={() => exportGeoJSON(reports.filter((r) => !r.duplicateOf))}>
+              <button className="btn" aria-label="Download all reports as GeoJSON" onClick={() => exportGeoJSON(reports.filter((r) => !r.duplicateOf))}>
                 <Download style={{ width: 18, height: 18 }} /> GeoJSON
               </button>
             </li>
@@ -272,7 +270,7 @@ export default function Data() {
                 <br />
                 <span>What is still waiting, for a repair crew's route planning.</span>
               </div>
-              <button className="btn" onClick={() => exportGeoJSON(reports.filter((r) => !r.duplicateOf && r.status !== "resolved"))}>
+              <button className="btn" aria-label="Download open reports as GeoJSON" onClick={() => exportGeoJSON(reports.filter((r) => !r.duplicateOf && r.status !== "resolved"))}>
                 <Download style={{ width: 18, height: 18 }} /> GeoJSON
               </button>
             </li>

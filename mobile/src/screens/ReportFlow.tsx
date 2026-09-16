@@ -1,9 +1,11 @@
+import { usePreventRemove } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useKeepAwake } from "expo-keep-awake";
+import * as Linking from "expo-linking";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { classifierAvailable, classifyHazardPhoto, type ClassificationResult } from "../ai/classify";
 import { findDuplicates, likelyDuplicate } from "../ai/dedup";
@@ -12,7 +14,7 @@ import { PinPicker } from "../components/Maps";
 import { nearestNeighborhood } from "../data/places";
 import { getPrefs, useSession } from "../data/session";
 import { getStore, useReports } from "../data/store";
-import { readBase64 } from "../data/fs";
+import { deleteIfExists, readBase64 } from "../data/fs";
 import type { ExifGeo } from "../lib/exif";
 import { uuid } from "../lib/format";
 import { fmtCoord, haversine, type LngLat } from "../lib/geo";
@@ -46,7 +48,7 @@ export function ReportFlowScreen({ navigation }: ScreenProps<"Report">) {
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState<Step>("capture");
   const gps = useLiveGps(step === "capture" || step === "locate" || step === "saving");
-  const [camPerm, requestCam] = useCameraPermissions();
+  const [camPerm, requestCam, getCam] = useCameraPermissions();
   const cam = useRef<CameraView>(null);
   const [camReady, setCamReady] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -64,10 +66,38 @@ export function ReportFlowScreen({ navigation }: ScreenProps<"Report">) {
   const [dupChoice, setDupChoice] = useState<"new" | "merge">("merge");
   const [submitted, setSubmitted] = useState<HazardReport | null>(null);
   const [albumNote, setAlbumNote] = useState<string | null>(null);
+  /** Set once the reporter picks by hand: a suggestion that arrives later never overrides them. */
+  const typeTouched = useRef(false);
+  const severityTouched = useRef(false);
+  /** The draft the classifier is reading; a retake starts a new one and orphans the old answer. */
+  const draftIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (camPerm && !camPerm.granted && camPerm.canAskAgain) void requestCam();
   }, [camPerm, requestCam]);
+
+  // Coming back from the Settings app with the camera switched on.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") void getCam?.();
+    });
+    return () => sub.remove();
+  }, [getCam]);
+
+  // The header's Back leaves the whole flow: ask before throwing away a photo and the picks.
+  usePreventRemove(Boolean(draft) && step !== "done", ({ data }) => {
+    Alert.alert("Discard this report?", "The photo and everything you picked will be deleted.", [
+      { text: "Keep editing", style: "cancel" },
+      {
+        text: "Discard",
+        style: "destructive",
+        onPress: () => {
+          discardDraftFiles(draft);
+          navigation.dispatch(data.action);
+        },
+      },
+    ]);
+  });
 
   useEffect(() => {
     navigation.setOptions({ title: step === "done" ? "Submitted" : `Report · step ${Math.min(STEP_INDEX[step] + 1, 4)} of 4` });
@@ -98,6 +128,12 @@ export function ReportFlowScreen({ navigation }: ScreenProps<"Report">) {
           : null;
       try {
         const photo = await processCapture(srcUri, size, geo, { id });
+        // Saving is done. The classifier below can take up to 25 s and must not keep
+        // the shutter disabled (a Retake during that wait used to leave it stuck).
+        setBusy(null);
+        draftIdRef.current = id;
+        typeTouched.current = false;
+        severityTouched.current = false;
         setDraft({ id, photo, takenAt: seed.takenAt, fix: seed.fix, headingDeg: seed.headingDeg, origin: geo ? coords : null, coords, method: seed.method, exifEmbedded: Boolean(geo) });
         setAi(null);
         setType(null);
@@ -108,22 +144,23 @@ export function ReportFlowScreen({ navigation }: ScreenProps<"Report">) {
           try {
             const b64 = await readBase64(photo.photoUri);
             const res = await classifyHazardPhoto(b64);
-            if (res) {
+            // A retake started a new draft while the model was reading this one.
+            if (res && draftIdRef.current === id) {
               setAi(res);
-              setType(res.label);
-              setSeverity(res.severity);
+              // The reporter's own picks win over a suggestion that arrives late.
+              if (!typeTouched.current) setType(res.label);
+              if (!severityTouched.current) setSeverity(res.severity);
             }
           } catch {
             /* the reporter picks */
           } finally {
-            setAiBusy(false);
+            if (draftIdRef.current === id) setAiBusy(false);
           }
         }
       } catch (e) {
+        setBusy(null);
         setError(e instanceof Error ? e.message : "Could not save that photo.");
         setStep("capture");
-      } finally {
-        setBusy(null);
       }
     },
     [],
@@ -283,6 +320,10 @@ The photo is still in the app's folder; try Submit again.`);
   }
 
   function reset() {
+    draftIdRef.current = null;
+    typeTouched.current = false;
+    severityTouched.current = false;
+    setAiBusy(false);
     setDraft(null);
     setAi(null);
     setType(null);
@@ -297,19 +338,32 @@ The photo is still in the app's folder; try Submit again.`);
     setStep("capture");
   }
 
+  /** Retake throws the photo away, so its files go too (after Submit they belong to the record). */
+  function retake() {
+    discardDraftFiles(draft);
+    reset();
+  }
+
   /* ---------- render ---------- */
 
   if (step === "capture" || step === "saving") {
     const granted = camPerm?.granted;
+    const blocked = camPerm != null && !camPerm.granted && !camPerm.canAskAgain;
     return (
       <View style={styles.camWrap}>
         {granted ? (
           <CameraView ref={cam} style={StyleSheet.absoluteFill} facing="back" mode="picture" onCameraReady={() => setCamReady(true)} animateShutter={false} />
         ) : (
           <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", padding: SP.xl, gap: SP.md }]}>
-            <Text style={[T.h2, { color: C.inkOnDark, textAlign: "center" }]}>The camera needs permission.</Text>
-            <Text style={{ color: C.inkOnDarkSoft, textAlign: "center" }}>Allow camera access, or choose a photo you already took.</Text>
-            <Button title="Allow camera" variant="primary" onPress={() => void requestCam()} />
+            <Text style={[T.h2, { color: C.inkOnDark, textAlign: "center" }]}>{blocked ? "Camera access is off." : "The camera needs permission."}</Text>
+            <Text style={{ color: C.inkOnDarkSoft, textAlign: "center" }}>
+              {blocked ? "Turn on Camera for SideQuest in Settings, or choose a photo you already took." : "Allow camera access, or choose a photo you already took."}
+            </Text>
+            {blocked ? (
+              <Button title="Open Settings" variant="primary" onPress={() => void Linking.openSettings()} />
+            ) : (
+              <Button title="Allow camera" variant="primary" onPress={() => void requestCam()} />
+            )}
           </View>
         )}
         <View style={[styles.camTop, { paddingTop: SP.sm }]}>
@@ -320,13 +374,13 @@ The photo is still in the app's folder; try Submit again.`);
         <View style={[styles.camBottom, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
           <Text style={styles.camHint}>Fill the frame with the hazard. Stay out of the street.</Text>
           <View style={styles.camRow}>
-            <Pressable onPress={pickFromLibrary} style={styles.camSide} accessibilityLabel="Choose from Photos">
+            <Pressable onPress={pickFromLibrary} style={styles.camSide} accessibilityRole="button" accessibilityLabel="Choose from Photos">
               <Text style={styles.camSideText}>Photos</Text>
             </Pressable>
-            <Pressable onPress={shutter} disabled={!granted || !camReady || Boolean(busy)} style={({ pressed }) => [styles.shutter, pressed ? { transform: [{ scale: 0.94 }] } : null, !camReady ? { opacity: 0.5 } : null]} accessibilityLabel="Take photo">
+            <Pressable onPress={shutter} disabled={!granted || !camReady || Boolean(busy)} style={({ pressed }) => [styles.shutter, pressed ? { transform: [{ scale: 0.94 }] } : null, !camReady ? { opacity: 0.5 } : null]} accessibilityRole="button" accessibilityLabel="Take photo">
               {busy ? <ActivityIndicator color={C.olive800} /> : <View style={styles.shutterInner} />}
             </Pressable>
-            <Pressable onPress={() => navigation.goBack()} style={styles.camSide} accessibilityLabel="Close">
+            <Pressable onPress={() => navigation.goBack()} style={styles.camSide} accessibilityRole="button" accessibilityLabel="Close">
               <Text style={styles.camSideText}>Close</Text>
             </Pressable>
           </View>
@@ -393,8 +447,8 @@ The photo is still in the app's folder; try Submit again.`);
       <Screen
         bottom={
           <Row gap={SP.sm}>
-            <Button title="Retake" onPress={reset} />
-            <Button title="Next: location" variant="primary" style={{ flex: 1 }} disabled={!type || !severity || aiBusy} onPress={() => setStep("locate")} />
+            <Button title="Retake" onPress={retake} />
+            <Button title="Next: location" variant="primary" style={{ flex: 1 }} disabled={!type || !severity} onPress={() => setStep("locate")} />
           </Row>
         }
       >
@@ -439,7 +493,17 @@ The photo is still in the app's folder; try Submit again.`);
                     <Row>
                       <Small>Or:</Small>
                       {ai.alternatives.map((a) => (
-                        <Pressable key={a.label} onPress={() => setType(a.label)}>
+                        <Pressable
+                          key={a.label}
+                          onPress={() => {
+                            typeTouched.current = true;
+                            setType(a.label);
+                          }}
+                          hitSlop={10}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Use ${HAZARD_SHORT[a.label]} instead, ${Math.round(a.confidence * 100)} percent`}
+                          accessibilityState={{ selected: type === a.label }}
+                        >
                           <Badge tone={type === a.label ? "olive" : "field"}>
                             {HAZARD_SHORT[a.label]} · {Math.round(a.confidence * 100)}%
                           </Badge>
@@ -454,10 +518,25 @@ The photo is still in the app's folder; try Submit again.`);
             </Card>
           ) : null}
           <Field label="Hazard type">
-            <OptionGrid options={HAZARD_ORDER.map((t) => ({ key: t, label: HAZARD_LABELS[t] }))} value={type} onChange={setType} />
+            <OptionGrid
+              options={HAZARD_ORDER.map((t) => ({ key: t, label: HAZARD_LABELS[t] }))}
+              value={type}
+              onChange={(t) => {
+                typeTouched.current = true;
+                setType(t);
+              }}
+            />
           </Field>
           <Field label="Severity">
-            <OptionGrid columns={1} options={SEVERITY_ORDER.map((s) => ({ key: s, label: SEVERITY_LABELS[s], hint: SEVERITY_HINT[s], dot: SEV_COLOR[s] }))} value={severity} onChange={setSeverity} />
+            <OptionGrid
+              columns={1}
+              options={SEVERITY_ORDER.map((s) => ({ key: s, label: SEVERITY_LABELS[s], hint: SEVERITY_HINT[s], dot: SEV_COLOR[s] }))}
+              value={severity}
+              onChange={(s) => {
+                severityTouched.current = true;
+                setSeverity(s);
+              }}
+            />
           </Field>
         </Stack>
       </Screen>
@@ -469,6 +548,7 @@ The photo is still in the app's folder; try Submit again.`);
     const moved = draft.origin ? haversine(draft.origin, coords) : null;
     return (
       <Screen
+        avoidKeyboard
         bottom={
           <Row gap={SP.sm}>
             <Button title="Back" onPress={() => setStep("classify")} />
@@ -532,6 +612,7 @@ The photo is still in the app's folder; try Submit again.`);
   if (step === "details" && draft) {
     return (
       <Screen
+        avoidKeyboard
         bottom={
           <Row gap={SP.sm}>
             <Button title="Back" onPress={() => setStep("locate")} />
@@ -574,6 +655,12 @@ The photo is still in the app's folder; try Submit again.`);
 
 function nearestFallback(c: LngLat): string {
   return `${nearestNeighborhood(c)}, ${c[1].toFixed(4)}, ${c[0].toFixed(4)}`;
+}
+
+/** Until Submit, a draft's photo files belong to no record: delete them when the draft is thrown away. */
+function discardDraftFiles(d: Draft | null) {
+  deleteIfExists(d?.photo?.photoUri);
+  deleteIfExists(d?.photo?.thumbUri);
 }
 
 const styles = StyleSheet.create({

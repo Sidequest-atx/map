@@ -1,14 +1,15 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { priorityLabel, rankReport } from "../ai/rank";
 import { verifyRepair, type VerificationResult } from "../ai/verify";
 import { DemoBadge, Lifecycle, SevBadge, SourceBadge, StatusBadge } from "../components/Bits";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { DoorHanger } from "../components/DoorHanger";
 import { Download } from "../components/Icons";
 import { toast } from "../components/Toast";
 import { NEIGHBORHOODS } from "../data/places";
 import { useSession } from "../data/session";
-import { getStore, useDrives, useReports } from "../data/store";
+import { getStore, useDrives, useLoadState, useReports } from "../data/store";
 import { exportCsv, exportGeoJSON } from "../lib/export";
 import { daysBetween, fmtInt, median, relativeDays, shortDate } from "../lib/format";
 import { downscalePhoto } from "../lib/image";
@@ -25,10 +26,41 @@ import {
 
 type Sort = "priority" | "newest" | "oldest";
 
+function useOnline() {
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    addEventListener("online", on);
+    addEventListener("offline", off);
+    return () => {
+      removeEventListener("online", on);
+      removeEventListener("offline", off);
+    };
+  }, []);
+  return online;
+}
+
+/** Below 1100px the detail panel stacks under the table. */
+function useNarrow() {
+  const query = "(max-width: 1099px)";
+  const [narrow, setNarrow] = useState(() => matchMedia(query).matches);
+  useEffect(() => {
+    const mq = matchMedia(query);
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
+
 export default function Portal() {
   const session = useSession();
   const reports = useReports();
   const drives = useDrives();
+  const load = useLoadState();
+  const online = useOnline();
+  const narrow = useNarrow();
   const [status, setStatus] = useState<ReportStatus | "all">("all");
   const [type, setType] = useState<HazardType | "all">("all");
   const [hood, setHood] = useState<string>("all");
@@ -36,6 +68,20 @@ export default function Portal() {
   const [sort, setSort] = useState<Sort>("priority");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  const sideRef = useRef<HTMLElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const lastSelected = useRef<string | null>(null);
+
+  // On narrow screens the detail renders below the whole table: bring it into
+  // view on select, and return to the list on close, so a tap never looks dead.
+  useEffect(() => {
+    if (narrow) {
+      const behavior = matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+      if (selectedId) sideRef.current?.scrollIntoView({ block: "start", behavior });
+      else if (lastSelected.current) tableRef.current?.scrollIntoView({ block: "start", behavior });
+    }
+    lastSelected.current = selectedId;
+  }, [selectedId, narrow]);
 
   const ranked = useMemo(() => reports.filter((r) => !r.duplicateOf).map((r) => ({ r, rank: rankReport(r) })), [reports]);
 
@@ -81,6 +127,13 @@ export default function Portal() {
   }, [ranked, reports]);
 
   const selected = selectedId ? reports.find((r) => r.id === selectedId) ?? null : null;
+  const anyFilter = status !== "all" || type !== "all" || hood !== "all" || q.trim() !== "";
+  const clearFilters = () => {
+    setStatus("all");
+    setType("all");
+    setHood("all");
+    setQ("");
+  };
 
   return (
     <div className="portal">
@@ -191,21 +244,34 @@ export default function Portal() {
       </div>
 
       <div className="portal-layout">
-        <div className="table-wrap">
+        <div className="table-wrap" ref={tableRef}>
           {rows.length === 0 ? (
             <div className="empty" style={{ border: 0 }}>
-              <h3>No reports match.</h3>
-              <button
-                className="btn btn--sm"
-                onClick={() => {
-                  setStatus("all");
-                  setType("all");
-                  setHood("all");
-                  setQ("");
-                }}
-              >
-                Clear filters
-              </button>
+              {load.error && reports.length === 0 ? (
+                <>
+                  <h3>Can't reach the report database right now.</h3>
+                  <p className="small muted">This is a connection or setup problem, not an empty list.</p>
+                  <button className="btn btn--sm" onClick={() => getStore().reload()}>
+                    Try again
+                  </button>
+                </>
+              ) : !load.loaded ? (
+                <h3>Loading reports…</h3>
+              ) : reports.length === 0 ? (
+                <>
+                  <h3>No reports yet.</h3>
+                  <p className="small muted">They appear here as soon as someone captures one in the app.</p>
+                </>
+              ) : (
+                <>
+                  <h3>No reports match.</h3>
+                  {anyFilter && (
+                    <button className="btn btn--sm" onClick={clearFilters}>
+                      Clear filters
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           ) : (
             <table className="table">
@@ -222,14 +288,27 @@ export default function Portal() {
               </thead>
               <tbody>
                 {rows.map(({ r, rank }) => (
-                  <tr key={r.id} className={selectedId === r.id ? "is-on" : ""} onClick={() => setSelectedId(r.id)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setSelectedId(r.id)}>
+                  <tr key={r.id} className={selectedId === r.id ? "is-on" : ""} onClick={() => setSelectedId(r.id)}>
                     <td>
                       <span className={`priority is-${priorityLabel(rank.score).toLowerCase()}`}>
                         <i style={{ "--p": `${rank.score}%` } as React.CSSProperties} />
                         <b>{rank.score}</b>
                       </span>
                     </td>
-                    <td className="ref">{r.ref}</td>
+                    <td className="ref">
+                      {/* the keyboard and screen-reader way to open a row */}
+                      <button
+                        type="button"
+                        className="row-select"
+                        aria-pressed={selectedId === r.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedId(r.id);
+                        }}
+                      >
+                        {r.ref}
+                      </button>
+                    </td>
                     <td>
                       <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
                         <i className={`sev-dot sev-dot--${r.severity}`} /> {HAZARD_SHORT[r.type]}
@@ -255,9 +334,9 @@ export default function Portal() {
           )}
         </div>
 
-        <aside className="portal-side">
+        <aside className="portal-side" ref={sideRef}>
           {selected ? (
-            <RowDetail key={selected.id} r={selected} moderator={session?.name ?? "moderator"} onClose={() => setSelectedId(null)} allReports={reports} />
+            <RowDetail key={selected.id} r={selected} moderator={session?.name ?? "Moderator"} online={online} onClose={() => setSelectedId(null)} allReports={reports} />
           ) : (
             <div className="stack">
               <div className="empty">
@@ -298,7 +377,19 @@ export default function Portal() {
 
 const selStyle: React.CSSProperties = { minHeight: "2.5rem", padding: ".4rem .7rem", borderRadius: "var(--r-md)", border: "1px solid var(--line-strong)", background: "var(--surface)" };
 
-function RowDetail({ r, moderator, onClose, allReports }: { r: HazardReport; moderator: string; onClose: () => void; allReports: HazardReport[] }) {
+function RowDetail({
+  r,
+  moderator,
+  online,
+  onClose,
+  allReports,
+}: {
+  r: HazardReport;
+  moderator: string;
+  online: boolean;
+  onClose: () => void;
+  allReports: HazardReport[];
+}) {
   const rank = rankReport(r);
   const idx = STATUS_FLOW.indexOf(r.status);
   const next = STATUS_FLOW[idx + 1];
@@ -306,31 +397,42 @@ function RowDetail({ r, moderator, onClose, allReports }: { r: HazardReport; mod
   const [after, setAfter] = useState<string | null>(r.afterPhoto ?? null);
   const [verifying, setVerifying] = useState(false);
   const [verdict, setVerdict] = useState<VerificationResult | null>(null);
+  const [aiNote, setAiNote] = useState<string | null>(null);
   const [mergeRef, setMergeRef] = useState("");
   const [reopenOpen, setReopenOpen] = useState(false);
+  const [hangerOpen, setHangerOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const path = fixPath(r.type);
 
+  // Follow the saved after-photo: cleared on reopen, swapped for the stored
+  // copy after a resolve lands.
+  useEffect(() => {
+    setAfter(r.afterPhoto ?? null);
+  }, [r.afterPhoto]);
+
   async function onAfterFile(file: File | undefined) {
     if (!file) return;
+    let url: string;
     try {
-      const url = await downscalePhoto(file);
-      setAfter(url);
-      setVerdict(null);
-      setVerifying(true);
-      try {
-        const v = await verifyRepair(r, url);
-        setVerdict(v);
-      } catch {
-        setVerdict(null);
-      } finally {
-        setVerifying(false);
-      }
+      url = await downscalePhoto(file);
     } catch {
       toast("Could not read that image", "danger");
+      return;
+    }
+    setAfter(url);
+    setVerdict(null);
+    setAiNote(null);
+    setVerifying(true);
+    try {
+      setVerdict(await verifyRepair(r, url));
+    } catch {
+      setAiNote("Couldn't check the photo automatically. Look it over yourself; you can still resolve.");
+    } finally {
+      setVerifying(false);
     }
   }
 
+  // Success toasts come from the store once the server confirms the save.
   function advance() {
     if (!next) return;
     if (next === "submitted-311" && path === "city" && !ticket.trim()) {
@@ -343,17 +445,12 @@ function RowDetail({ r, moderator, onClose, allReports }: { r: HazardReport; mod
       by: moderator,
       verified: next === "resolved" ? Boolean(verdict?.looksFixed) : undefined,
     });
-    if (!res.ok) {
-      toast(res.reason, "danger");
-      return;
-    }
-    toast(`${r.ref} → ${STATUS_LABELS[next]}`, "ok");
+    if (!res.ok) toast(res.reason, "danger");
   }
 
-  function resolveVegetation() {
+  function resolveNow() {
     const res = getStore().setStatus(r.id, "resolved", { afterPhoto: after ?? undefined, by: moderator, verified: Boolean(verdict?.looksFixed) });
     if (!res.ok) toast(res.reason, "danger");
-    else toast(`${r.ref} resolved without a city ticket`, "ok");
   }
 
   function merge() {
@@ -362,12 +459,18 @@ function RowDetail({ r, moderator, onClose, allReports }: { r: HazardReport; mod
       toast("No open report with that ref", "danger");
       return;
     }
-    getStore().update(r.id, { duplicateOf: target.id });
-    toast(`${r.ref} merged into ${target.ref}`, "ok");
+    getStore().update(r.id, { duplicateOf: target.id }, { successToast: `${r.ref} merged into ${target.ref}` });
     onClose();
   }
 
+  function printHanger() {
+    setHangerOpen(true);
+    // Let the preview open first: print styles only show the visible hanger.
+    window.setTimeout(() => window.print(), 80);
+  }
+
   const canResolveNow = Boolean(after);
+  const pickAfter = () => fileRef.current?.click();
 
   return (
     <div className="row-detail">
@@ -380,10 +483,9 @@ function RowDetail({ r, moderator, onClose, allReports }: { r: HazardReport; mod
         onConfirm={() => {
           getStore().setStatus(r.id, "open", { by: moderator });
           setReopenOpen(false);
-          toast(`${r.ref} reopened`);
         }}
       >
-        <p className="muted">The record keeps its history; verification is cleared.</p>
+        <p className="muted">The record keeps its history. The close-out, after-photo and verification are cleared, so it needs a new after-photo to resolve again.</p>
       </ConfirmDialog>
 
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
@@ -401,10 +503,18 @@ function RowDetail({ r, moderator, onClose, allReports }: { r: HazardReport; mod
         </button>
       </div>
 
-      {r.photo || r.afterPhoto ? (
+      {r.photo || after ? (
         <div className="photos">
           {r.photo ? <img src={r.photo} alt="Before" /> : <div className="skeleton" style={{ aspectRatio: "4/3" }} />}
-          {after ? <img src={after} alt="After" /> : <div className="upload-tile" onClick={() => fileRef.current?.click()}>No after-photo yet</div>}
+          {after ? (
+            <img src={after} alt="After" />
+          ) : r.status !== "resolved" ? (
+            <button type="button" className="upload-tile" onClick={pickAfter} disabled={!online}>
+              Add an after-photo
+            </button>
+          ) : (
+            <div className="upload-tile is-static">No after-photo on file</div>
+          )}
         </div>
       ) : null}
 
@@ -468,10 +578,10 @@ function RowDetail({ r, moderator, onClose, allReports }: { r: HazardReport; mod
                 <input value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="e.g. 24-00318842" />
                 <span className="hint">
                   File it at{" "}
-                  <a href="https://311.austintexas.gov/" rel="noopener">
+                  <a href="https://311.austintexas.gov/" target="_blank" rel="noopener noreferrer">
                     311.austintexas.gov
                   </a>{" "}
-                  then paste the number here.
+                  (opens a new tab), then paste the number here.
                 </span>
               </label>
             )}
@@ -480,10 +590,14 @@ function RowDetail({ r, moderator, onClose, allReports }: { r: HazardReport; mod
                 <div>
                   <b>Vegetation path.</b> Print the door-hanger and leave it. Resolve here when the after-photo comes back; no 311 ticket needed.
                   <div className="btn-row" style={{ marginTop: 8 }}>
-                    <Link to="/how" className="btn btn--sm" viewTransition>
+                    <button type="button" className="btn btn--sm" onClick={printHanger}>
                       Print door-hanger
-                    </Link>
+                    </button>
                   </div>
+                  <details className="hanger-preview" open={hangerOpen} onToggle={(e) => setHangerOpen(e.currentTarget.open)}>
+                    <summary className="small muted">Preview this report's door-hanger</summary>
+                    <DoorHanger reportRef={r.ref} photo={r.photo} />
+                  </details>
                 </div>
               </div>
             )}
@@ -491,10 +605,10 @@ function RowDetail({ r, moderator, onClose, allReports }: { r: HazardReport; mod
             <div className="field">
               <span>After-photo {next === "resolved" || path === "landowner" ? "(required to resolve)" : "(optional until resolution)"}</span>
               <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => onAfterFile(e.target.files?.[0])} />
-              <div className="upload-tile" onClick={() => fileRef.current?.click()} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && fileRef.current?.click()}>
+              <button type="button" className="upload-tile" onClick={pickAfter} disabled={!online}>
                 {after ? <img src={after} alt="After-photo preview" /> : <span>Upload the after-photo</span>}
                 {after && <span className="small">Tap to replace</span>}
-              </div>
+              </button>
               {verifying && <span className="hint">Checking the after-photo…</span>}
               {verdict && (
                 <div className={`notice ${verdict.looksFixed ? "notice--ok" : "notice--warn"}`} role="status">
@@ -503,20 +617,26 @@ function RowDetail({ r, moderator, onClose, allReports }: { r: HazardReport; mod
                   </div>
                 </div>
               )}
+              {aiNote && (
+                <div className="notice" role="status">
+                  <div>{aiNote}</div>
+                </div>
+              )}
             </div>
 
             <div className="btn-row">
               {next && !(path === "landowner" && r.status === "open") && (
-                <button className="btn btn--primary" onClick={advance} disabled={next === "resolved" && !canResolveNow}>
+                <button className="btn btn--primary" onClick={advance} disabled={!online || (next === "resolved" && !canResolveNow)}>
                   Mark {STATUS_LABELS[next].toLowerCase()}
                 </button>
               )}
               {(path === "landowner" || r.status === "open") && (
-                <button className="btn" onClick={resolveVegetation} disabled={!canResolveNow} title={!canResolveNow ? "Needs an after-photo" : ""}>
+                <button className="btn" onClick={resolveNow} disabled={!online || !canResolveNow} title={!canResolveNow ? "Needs an after-photo" : ""}>
                   Resolve with after-photo
                 </button>
               )}
             </div>
+            {!online && <p className="small muted">You're offline. Moderation needs a connection; these buttons come back when it does.</p>}
             {!canResolveNow && (next === "resolved" || path === "landowner") && (
               <p className="small muted">Resolution is blocked until an after-photo is attached. That rule is enforced in the data store, not just here.</p>
             )}
@@ -524,16 +644,14 @@ function RowDetail({ r, moderator, onClose, allReports }: { r: HazardReport; mod
         )}
         {r.status === "resolved" && (
           <div className="btn-row">
-            <button className="btn btn--danger btn--sm" onClick={() => setReopenOpen(true)}>
+            <button className="btn btn--danger btn--sm" onClick={() => setReopenOpen(true)} disabled={!online}>
               Reopen
             </button>
             {!r.verified && after && (
               <button
                 className="btn btn--sm"
-                onClick={() => {
-                  getStore().update(r.id, { verified: true, resolvedBy: moderator });
-                  toast(`${r.ref} verified by ${moderator}`, "ok");
-                }}
+                disabled={!online}
+                onClick={() => getStore().update(r.id, { verified: true, resolvedBy: moderator }, { successToast: `${r.ref} verified by ${moderator}` })}
               >
                 Mark verified
               </button>
@@ -547,7 +665,7 @@ function RowDetail({ r, moderator, onClose, allReports }: { r: HazardReport; mod
           </summary>
           <div className="btn-row" style={{ marginTop: 8 }}>
             <input value={mergeRef} onChange={(e) => setMergeRef(e.target.value)} placeholder="SQ-0001" style={{ ...selStyle, width: "8rem" }} aria-label="Target ref" />
-            <button className="btn btn--sm" onClick={merge} disabled={!mergeRef.trim()}>
+            <button className="btn btn--sm" onClick={merge} disabled={!online || !mergeRef.trim()}>
               Merge
             </button>
           </div>
@@ -558,8 +676,13 @@ function RowDetail({ r, moderator, onClose, allReports }: { r: HazardReport; mod
         <Link to={`/map?r=${r.ref}`} className="btn btn--sm" viewTransition>
           View on map
         </Link>
-        <a className="btn btn--sm btn--ghost" href={`https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`} rel="noopener">
-          Street view
+        <a
+          className="btn btn--sm btn--ghost"
+          href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${r.lat},${r.lng}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Street View
         </a>
       </div>
     </div>

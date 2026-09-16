@@ -63,12 +63,13 @@ create index if not exists sq_reports_user_idx on public.sq_reports(user_id);
 
 -- Human ref counter
 create sequence if not exists public.sq_report_ref_seq;
+-- Always the server's number: a client-sent ref is ignored, so nobody can
+-- claim SQ-0001 or squat the ref another report is about to get. The app never
+-- sends one; it reads the assigned ref back from its upsert.
 create or replace function public.sq_assign_ref() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  if new.ref is null or new.ref = '' then
-    new.ref := 'SQ-' || lpad(nextval('public.sq_report_ref_seq')::text, 4, '0');
-  end if;
+  new.ref := 'SQ-' || lpad(nextval('public.sq_report_ref_seq')::text, 4, '0');
   return new;
 end $$;
 drop trigger if exists sq_reports_assign_ref on public.sq_reports;
@@ -144,32 +145,53 @@ language sql stable as $$
   select coalesce(auth.jwt() -> 'app_metadata' ->> 'sq_role', '') = 'moderator'
 $$;
 
--- James runs moderation; grant on signup so no dashboard step is needed.
--- The +sidequest alias exists because the bare Gmail may already be a
--- Google-identity user of this shared project (no password): signing up
--- in-app with the alias mints a fresh password account, same inbox.
-create or replace function public.sq_grant_moderator() returns trigger
-language plpgsql security definer set search_path = public as $$
-begin
-  if new.email in ('jamesjli2025@gmail.com', 'jamesjli2025+sidequest@gmail.com') then
-    new.raw_app_meta_data := coalesce(new.raw_app_meta_data, '{}'::jsonb) || '{"sq_role":"moderator"}'::jsonb;
-  end if;
-  return new;
-end $$;
-
--- Guarded like the storage section: if auth.users is off-limits to this role,
--- the rest of the file still commits and the NOTICE says what to do instead.
+-- Moderators are granted by hand, never by matching an email at sign-up:
+-- with email confirmation off, anyone could register the address first and
+-- inherit the role. After James signs up in the app (the +sidequest alias,
+-- because the bare Gmail is already a Google user of this shared project),
+-- run this once in the SQL editor, then sign out and back in:
+--   update auth.users
+--   set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"sq_role":"moderator"}'::jsonb
+--   where email = 'jamesjli2025+sidequest@gmail.com';
+-- Earlier versions of this file installed an email-match auto-grant; remove it.
 do $$
 begin
   execute 'drop trigger if exists sq_grant_moderator on auth.users';
-  execute 'create trigger sq_grant_moderator before insert on auth.users for each row execute function public.sq_grant_moderator()';
-  -- ...and retroactively, in case the account already exists in this project.
-  update auth.users
-    set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"sq_role":"moderator"}'::jsonb
-    where email in ('jamesjli2025@gmail.com', 'jamesjli2025+sidequest@gmail.com');
-exception when insufficient_privilege then
-  raise notice 'moderator auto-grant needs the dashboard: after signing up, set app_metadata {"sq_role":"moderator"} on your user in Authentication -> Users';
+  execute 'drop function if exists public.sq_grant_moderator()';
+exception when insufficient_privilege or dependent_objects_still_exist then
+  raise notice 'remove the old sq_grant_moderator trigger on auth.users in Database -> Triggers, then re-run this file';
 end $$;
+
+-- Only moderators move a report through its lifecycle. Owners can still fix
+-- descriptive fields (type, severity, place, notes); for everyone else the
+-- lifecycle columns and the ref keep their stored values. Service-role jobs
+-- and SQL-editor sessions carry no 'authenticated' JWT, so they pass through.
+create or replace function public.sq_guard_moderation() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(auth.jwt() ->> 'role', '') = 'authenticated' and not public.sq_is_moderator() then
+    if tg_op = 'INSERT' then
+      new.status := 'open';
+      new.verified := false;
+      new.ticket_311 := null;
+      new.resolved_at := null;
+      new.resolved_by := null;
+      new.after_photo_path := null;
+    else
+      new.ref := old.ref;
+      new.status := old.status;
+      new.verified := old.verified;
+      new.ticket_311 := old.ticket_311;
+      new.resolved_at := old.resolved_at;
+      new.resolved_by := old.resolved_by;
+      new.after_photo_path := old.after_photo_path;
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists sq_guard_moderation on public.sq_reports;
+create trigger sq_guard_moderation before insert or update on public.sq_reports
+  for each row execute function public.sq_guard_moderation();
 
 -- -------------------------------------------------------------------- RLS ---
 

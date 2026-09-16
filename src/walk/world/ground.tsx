@@ -5,9 +5,11 @@
  * All of it merges into one mesh per material.
  */
 import * as THREE from "three";
+import { useFrame } from "@react-three/fiber";
 import { GeoBatch, once, ribbon, trs } from "./util";
 import { worldLib } from "./materials";
-import { rng } from "./rng";
+import { walkState } from "../state";
+import { clamp, rng } from "./rng";
 import {
   CURB_H,
   CURB_W,
@@ -345,6 +347,22 @@ function buildGround() {
 
 const builtGround = once(buildGround);
 
+/** Which crack atlas shows follows the shot: the bold one reads from the
+    aerial beats, the true-width one takes over as the camera lands on a panel. */
+function CrackLod() {
+  const lib = worldLib();
+  useFrame(() => {
+    const near = clamp((18 - walkState.view) / 8, 0, 1);
+    const far = lib.mats.cracks;
+    const close = lib.mats.cracksNear;
+    far.opacity = 1 - near;
+    close.opacity = near;
+    far.visible = near < 0.995;
+    close.visible = near > 0.005;
+  });
+  return null;
+}
+
 export function Ground() {
   const lib = worldLib();
   const g = builtGround();
@@ -358,6 +376,8 @@ export function Ground() {
       {g.paintY && <mesh geometry={g.paintY} material={lib.mats.paintYellow} receiveShadow />}
       {g.dirt && <mesh geometry={g.dirt} material={lib.mats.dirt} receiveShadow />}
       {g.cracks && <mesh geometry={g.cracks} material={lib.mats.cracks} receiveShadow />}
+      {g.cracks && <mesh geometry={g.cracks} material={lib.mats.cracksNear} receiveShadow />}
+      <CrackLod />
     </group>
   );
 }

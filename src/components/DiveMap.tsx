@@ -142,5 +142,7 @@ export default function DiveMap({ progress, onFail }: { progress: MotionValue<nu
     });
   }, [reports]);
 
-  return <div ref={containerRef} className="absolute inset-0" aria-hidden />;
+  // Decorative and non-interactive: inert keeps Mapbox's attribution links
+  // out of the tab order while the layer is hidden from screen readers.
+  return <div ref={containerRef} className="absolute inset-0" aria-hidden inert />;
 }

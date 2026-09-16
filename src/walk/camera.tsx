@@ -20,14 +20,19 @@ const KEYS: Key[] = [
   K(BEATS.missing - 0.045, 36, 38, 46),
   K(BEATS.missing, 31, 45, 38, 0, 5),
   K(0.245, 36, 38, 46),
-  K(BEATS.broken, 25, 29, 29, -0.5, 3),
+  K(0.302, 30, 33, 19, -0.3, 2.2), // dropping toward the walk
+  /* THE PANEL. The page's whole claim is that nobody knows this network by
+     the panel, so once per scroll the camera has to actually be down on one:
+     a lifted, cracked slab filling the frame, lip in profile. */
+  K(BEATS.broken, 20, 30, 8, -0.1, 1.1),
+  K(0.372, 30, 34, 21, -0.2, 2.4), // and back up
   K(0.395, 36, 38, 46),
   K(BARTON_BEAT, 30, 50, 86, -34, 4),
   K(0.475, 36, 38, 46),
   K(BEATS.math, 29, 34, 33, 0, 4),
   K(0.555, 29, 36, 32, 0, 4),
   K(0.6, 36, 38, 46),
-  K(BEATS.falls, 22, 26, 24, 0.5, 2),
+  K(BEATS.falls, 20, 26, 16, 0.4, 1.6),
   K(0.7, 36, 38, 48),
   K(BEATS.precedent, 26, 32, 29, 0, 3),
   K(0.84, 35, 40, 52),
@@ -118,11 +123,14 @@ export function CameraRig({
   reduced,
   prologue,
   prologueMode = "auto",
+  built = true,
 }: {
   progress: MotionValue<number>;
   finale: MotionValue<number>;
   centerBias: MotionValue<number>;
   reduced: boolean;
+  /** false while the world is still compiling behind the poster */
+  built?: boolean;
   /** prologue progress: scroll-out of the prologue viewport (auto) or the
       full scrub track; undefined = no drone prologue (dev harness default) */
   prologue?: MotionValue<number>;
@@ -154,7 +162,8 @@ export function CameraRig({
       if (prologueMode === "scrub") {
         uTarget = pv;
       } else {
-        t.clock += dt;
+        // the flyover's clock starts when the world is shown, not while it builds
+        if (built) t.clock += dt;
         const autoU = Math.min(HOLD_U, (t.clock / AUTO_DUR) * HOLD_U);
         // scroll owns the descent — but contributes nothing until it moves
         const descentU = pv > 0.0005 ? HOLD_U + pv * (1 - HOLD_U) : 0;
@@ -225,6 +234,8 @@ export function CameraRig({
     walkState.focus.z = focus.z;
     walkState.s = t.s;
     walkState.rise = rise;
+    walkState.view = view;
+    walkState.f = f;
   });
 
   return null;

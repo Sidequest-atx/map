@@ -8,11 +8,11 @@ import type { Role } from "../types";
  * unchanged from the mock era, so pages only ever see { name, role, since }.
  *
  * public         can view the site and map (no account)
- * reporter       submits photos — from the iPhone app only
+ * reporter       submits photos, from the iPhone app only (accounts are made there)
  * moderator      routes reports to 311, verifies close-outs (the Portal here)
  *
- * Moderator comes from the JWT claim app_metadata.sq_role, granted server-side
- * (see supabase/schema.sql); nothing a client sends can elevate it.
+ * Moderator comes from the JWT claim app_metadata.sq_role, granted by hand in
+ * the database (see supabase/SETUP.md); nothing a client sends can elevate it.
  *
  * With VITE_DEMO=1 the old localStorage mock session returns, matching the
  * seeded demo store.
@@ -36,15 +36,11 @@ function emit() {
 function fromSupabase(s: SupabaseSession | null): Session | null {
   if (!s) return null;
   const meta = (s.user.app_metadata ?? {}) as { sq_role?: string };
-  const name =
-    (s.user.user_metadata as { display_name?: string } | null)?.display_name?.trim() ||
-    s.user.email?.split("@")[0] ||
-    "Quester";
-  return {
-    name,
-    role: meta.sq_role === "moderator" ? "moderator" : "reporter",
-    since: s.user.created_at,
-  };
+  const role: Role = meta.sq_role === "moderator" ? "moderator" : "reporter";
+  // Never fall back to the email handle: this name is written into public
+  // fields such as a report's "resolved by".
+  const name = (s.user.user_metadata as { display_name?: string } | null)?.display_name?.trim() || (role === "moderator" ? "Moderator" : "Quester");
+  return { name, role, since: s.user.created_at };
 }
 
 if (!DEMO) {
@@ -67,21 +63,34 @@ if (!DEMO) {
   });
 }
 
-export async function signInWithPassword(email: string, password: string): Promise<void> {
-  const { error } = await supabase().auth.signInWithPassword({ email, password });
-  if (error) throw new Error(error.message);
+/** Signs in and returns the session (role included) so the caller can route by role. */
+export async function signInWithPassword(email: string, password: string): Promise<Session> {
+  const { data, error } = await supabase().auth.signInWithPassword({ email: email.trim(), password });
+  if (error) throw error;
+  const s = fromSupabase(data.session);
+  if (!s) throw new Error("Sign-in returned no session.");
+  current = s;
+  emit();
+  return s;
 }
 
-export async function signUpWithPassword(name: string, email: string, password: string): Promise<void> {
-  const { data, error } = await supabase().auth.signUp({
-    email,
-    password,
-    options: { data: { display_name: name.trim() } },
-  });
-  if (error) throw new Error(error.message);
-  // With email confirmation off this returns a session; if confirmation is on,
-  // tell the person what to do instead of silently doing nothing.
-  if (!data.session) throw new Error("Account created — confirm the email we sent, then sign in.");
+/** Emails a one-time code for choosing a new password (Supabase recovery OTP). */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const { error } = await supabase().auth.resetPasswordForEmail(email.trim());
+  if (error) throw error;
+}
+
+/** Checks the emailed code, sets the new password, and signs the person in. */
+export async function resetPasswordWithCode(email: string, code: string, newPassword: string): Promise<Session> {
+  const { data, error } = await supabase().auth.verifyOtp({ email: email.trim(), token: code.replace(/\s+/g, ""), type: "recovery" });
+  if (error) throw error;
+  const { error: updateError } = await supabase().auth.updateUser({ password: newPassword });
+  if (updateError) throw updateError;
+  const s = fromSupabase(data.session);
+  if (!s) throw new Error("Reset returned no session.");
+  current = s;
+  emit();
+  return s;
 }
 
 /* ---------------- Demo mock (VITE_DEMO=1) ---------------- */
@@ -117,10 +126,12 @@ export function signOut() {
     emit();
     return;
   }
+  // Local scope: signing out of the website must not also sign the same
+  // account out of the phone app (the default scope is "global").
   // onAuthStateChange clears `current` on success; a failed (offline) revoke
   // still signs this browser out locally.
   supabase()
-    .auth.signOut()
+    .auth.signOut({ scope: "local" })
     .then(({ error }) => {
       if (error) {
         current = null;

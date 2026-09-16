@@ -13,6 +13,10 @@ import { ROOT_HEAVE } from "./defects";
 const GREENS = ["#57703d", "#647f45", "#4c6636", "#71894f", "#5e7a41"] as const;
 const DRY = ["#7d8a4d", "#8e9455", "#6f7c44"] as const;
 
+/* One canopy primitive for every blob: batches copy it, so it is never mutated.
+   (Building a fresh icosahedron per tree was ~0.5s of the page's build on a phone.) */
+const blob = once(() => new THREE.IcosahedronGeometry(1, 1));
+
 export function oak(trunkB: GeoBatch, folB: GeoBatch, x: number, z: number, seed: number, size: number) {
   const r = rng(seed);
   const h = size * (0.9 + r() * 0.3);
@@ -23,7 +27,7 @@ export function oak(trunkB: GeoBatch, folB: GeoBatch, x: number, z: number, seed
   trunkB.add(branch, trs(x + (r() - 0.5) * size * 0.3, h * 0.8, z + (r() - 0.5) * size * 0.3, r() * 3, 1, 1, 1, 0.7 + r() * 0.5, 0));
   branch.dispose();
   const blobs = 4 + Math.floor(r() * 3);
-  const ico = new THREE.IcosahedronGeometry(1, 1);
+  const ico = blob();
   for (let i = 0; i < blobs; i++) {
     const br = size * (0.42 + r() * 0.35);
     const ang = (i / blobs) * Math.PI * 2 + r();
@@ -35,18 +39,16 @@ export function oak(trunkB: GeoBatch, folB: GeoBatch, x: number, z: number, seed
       pick(r, GREENS),
     );
   }
-  ico.dispose();
 }
 
 function bush(folB: GeoBatch, x: number, z: number, seed: number, s = 1) {
   const r = rng(seed);
-  const ico = new THREE.IcosahedronGeometry(1, 1);
+  const ico = blob();
   const n = 1 + Math.floor(r() * 2);
   for (let i = 0; i < n; i++) {
     const br = s * (0.45 + r() * 0.3);
     folB.add(ico, trs(x + (r() - 0.5) * s * 1.2, br * 0.7, z + (r() - 0.5) * s * 0.8, r() * 3, br, br * 0.75, br), pick(r, GREENS));
   }
-  ico.dispose();
 }
 
 function weed(folB: GeoBatch, x: number, z: number, seed: number) {

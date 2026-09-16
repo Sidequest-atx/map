@@ -5,7 +5,7 @@ import { priorityLabel, rankReport } from "../ai/rank";
 import { DemoBadge, Lifecycle, SevBadge, SourceBadge, StatusBadge, TypeBadge } from "../components/Bits";
 import { Close, Filter } from "../components/Icons";
 import { useSheetDrag } from "../components/useSheetDrag";
-import { useReports } from "../data/store";
+import { getStore, useReports } from "../data/store";
 import { relativeDays, shortDate } from "../lib/format";
 import { bboxOf } from "../lib/geo";
 import { MAP_STYLE, mapboxgl, NW_AUSTIN, SEVERITY_COLORS, tintMap, useMapboxToken } from "../lib/mapbox";
@@ -109,12 +109,23 @@ export default function MapExplorer() {
             <Filter style={{ width: 16, height: 16 }} /> Filters{anyFilter ? " •" : ""}
           </button>
           <span className="count">
-            {visible.length} shown of {reports.filter((r) => !r.duplicateOf).length} <DemoBadge />
+            {getStore().loadState().error && reports.length === 0 ? (
+              <>
+                Couldn't load reports.{" "}
+                <button type="button" className="linklike" onClick={() => getStore().reload()}>
+                  Try again
+                </button>
+              </>
+            ) : (
+              <>
+                {visible.length} shown of {reports.filter((r) => !r.duplicateOf).length} <DemoBadge />
+              </>
+            )}
           </span>
         </div>
         <div className="explorer-filters">
           <div>
-            <h4>Hazard</h4>
+            <h2 className="filter-h">Hazard</h2>
             <div className="chips">
               {TYPES.map((t) => (
                 <button key={t} className={`chip ${types.has(t) ? "is-on" : ""}`} onClick={() => setTypes(toggle(types, t))} aria-pressed={types.has(t)}>
@@ -124,7 +135,7 @@ export default function MapExplorer() {
             </div>
           </div>
           <div>
-            <h4>Severity</h4>
+            <h2 className="filter-h">Severity</h2>
             <div className="chips">
               {SEVS.map((s) => (
                 <button key={s} className={`chip ${sevs.has(s) ? "is-on" : ""}`} onClick={() => setSevs(toggle(sevs, s))} aria-pressed={sevs.has(s)}>
@@ -134,7 +145,7 @@ export default function MapExplorer() {
             </div>
           </div>
           <div>
-            <h4>Status</h4>
+            <h2 className="filter-h">Status</h2>
             <div className="chips">
               {STATUSES.map((s) => (
                 <button key={s} className={`chip ${statuses.has(s) ? "is-on" : ""}`} onClick={() => setStatuses(toggle(statuses, s))} aria-pressed={statuses.has(s)}>
@@ -157,7 +168,17 @@ export default function MapExplorer() {
             ) : null}
           </div>
           {visible.length === 0 &&
-            (reports.length === 0 ? (
+            (getStore().loadState().error && reports.length === 0 ? (
+              <div className="empty">
+                <h3>Can't load reports right now.</h3>
+                <p className="small muted">
+                  This is a connection or setup problem, not an empty map.{" "}
+                  <button type="button" className="linklike" onClick={() => getStore().reload()}>
+                    Try again
+                  </button>
+                </p>
+              </div>
+            ) : reports.length === 0 ? (
               <div className="empty">
                 <h3>The map is waiting for its first photo.</h3>
                 <p className="small muted">
@@ -471,14 +492,16 @@ function Detail({ report: r, onClose }: { report: HazardReport; onClose: () => v
           <div className="btn-row">
             <button
               className="btn btn--sm"
-              onClick={() => {
-                const url = `${location.origin}/map?r=${r.ref}`;
-                navigator.clipboard?.writeText(url).then(() => import("../components/Toast").then((m) => m.toast("Link copied", "ok")));
-              }}
+              onClick={() => void import("../lib/clipboard").then((m) => m.copyLink(`${location.origin}/map?r=${r.ref}`))}
             >
               Copy link
             </button>
-            <a className="btn btn--sm btn--ghost" href={`https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}&travelmode=walking`} rel="noopener">
+            <a
+              className="btn btn--sm btn--ghost"
+              href={`https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}&travelmode=walking`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               Directions
             </a>
           </div>
@@ -502,15 +525,14 @@ function MapFallback({ reports, onSelect, tokenMissing }: { reports: HazardRepor
       <div className="wrap" style={{ paddingTop: "calc(4.5rem + 30dvh)" }}>
         <div className="notice notice--warn">
           <div>
-            <b>The map tiles are unavailable right now.</b>{" "}
-            {tokenMissing ? (
+            <b>The map can't load right now.</b> The reports are still here as a list.
+            {tokenMissing && import.meta.env.DEV ? (
               <>
-                Add a <span className="mono">mapbox_public_token</span> row to <span className="mono">sq_config</span> (or set{" "}
-                <span className="mono">VITE_MAPBOX_TOKEN</span> for local dev).
+                {" "}
+                (Dev: add a <span className="mono">mapbox_public_token</span> row to <span className="mono">sq_config</span> or set{" "}
+                <span className="mono">VITE_MAPBOX_TOKEN</span>.)
               </>
-            ) : (
-              <>Could be the network or the token. The reports are still here as a list.</>
-            )}
+            ) : null}
           </div>
         </div>
         <ul className="map-fallback-list">

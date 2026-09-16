@@ -1,11 +1,10 @@
 import { Link } from "react-router-dom";
-import { Motif } from "../components/Motif";
+import { CONTACT_EMAIL } from "../lib/site";
 
 export default function GetApp() {
   return (
     <>
-      <section className="section has-motif">
-        <Motif kind="crack" opacity={0.12} style={{ color: "var(--olive-800)" }} />
+      <section className="section">
         <div className="wrap split">
           <h1 className="h1">The camera lives in the iPhone app.</h1>
           <p className="lede">
@@ -23,8 +22,8 @@ export default function GetApp() {
               <div>
                 <h3>Ask for a build.</h3>
                 <p>
-                  SideQuest ATX is family-and-volunteers software, installed directly rather than through the App Store. Write to{" "}
-                  <a href="mailto:hello@sidequestatx.org">hello@sidequestatx.org</a> and we will get the current build onto your phone.
+                  SideQuest ATX is family-and-volunteers software, installed directly rather than through the App Store. Email{" "}
+                  <a href={`mailto:${CONTACT_EMAIL}?subject=SideQuest%20app`}>{CONTACT_EMAIL}</a> and we will get the current build onto your phone.
                 </p>
               </div>
             </li>
@@ -45,8 +44,8 @@ export default function GetApp() {
             </li>
           </ol>
           <p className="small muted">
-            Moderators sign in <Link to="/app/signin" viewTransition>here on the website</Link> to route reports to 311 and verify close-outs. Looking
-            is free for everyone: <Link to="/map" viewTransition>the map needs no account</Link>.
+            Moderators route reports to 311 and verify close-outs on the website: <Link to="/app/signin" viewTransition>moderator sign-in</Link>.
+            Looking is free for everyone: <Link to="/map" viewTransition>the map needs no account</Link>.
           </p>
         </div>
       </section>

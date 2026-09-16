@@ -7,3 +7,21 @@ dist
 *.log
 .vercel
 .env*
+
+# Render pipeline: multi-GB assets, caches, frames and the scene file stay local
+# (scripts, world.json and out/REPORT.md are tracked)
+render/assets/
+render/cache/
+render/out/*
+!render/out/REPORT.md
+render/street.blend
+render/gis/.venv/
+render/gis/_sources/
+render/gis/_logs/
+render/gis/downtown/
+render/gis/anderson_mill/
+# Stock aerial clips trialled and dropped (opt-in ?film=1 only)
+public/prologue/
+render/*.blend*
+__pycache__/
+*.pyc

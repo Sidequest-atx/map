@@ -4,7 +4,8 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 export type RootStackParamList = {
   Home: undefined;
   Report: undefined;
-  Drive: undefined;
+  /** resume: open straight into the unfinished drive's review (Home's "Resume review") */
+  Drive: { resume?: boolean } | undefined;
   GlassesWalk: undefined;
   Reports: undefined;
   ReportDetail: { id: string };

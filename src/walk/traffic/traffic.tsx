@@ -27,39 +27,121 @@ const FLEET: Record<FleetName, { file: string; len: number; yawFix: number }> = 
   cybertruck: { file: "cybertruck.glb", len: 5.7, yawFix: 0 },
 };
 
-/** Neutralize a loud baked livery (the bus's transit blues and yellows). */
+/** Re-livery the transit bus as a CapMetro bus: the model's baked STM blue
+    becomes CapMetro blue, the white stays white, the amber sign stays amber. */
 function neutralizeLivery(m: THREE.Material): THREE.Material {
   const sm = m as THREE.MeshStandardMaterial;
   if (!sm.color) return m;
-  const { r, g, b } = sm.color;
+  const { r, b } = sm.color;
   if (b > r + 0.12 && b > 0.3) {
     const c = sm.clone();
-    c.color.set("#8a9179"); // brand olive-gray where the blue was
-    return c;
-  }
-  if (r > 0.55 && g > 0.4 && b < 0.25) {
-    const c = sm.clone();
-    c.color.set("#b0a488");
+    c.color.set("#1c5fb0");
     return c;
   }
   return m;
+}
+
+const isBlue = (m: THREE.Material) => {
+  const c = (m as THREE.MeshStandardMaterial).color;
+  return !!c && c.b > c.r + 0.12 && c.b > 0.3;
+};
+
+/**
+ * Yaw that lays a model's long axis along z. The bounding box can't tell for
+ * a model baked at a diagonal (the bus sits at 45°, so its box is square and
+ * the old longest-side test sent it down the road sideways); the principal
+ * axis of the vertex cloud can. Returns null when the box already answers.
+ */
+function diagonalYaw(obj: THREE.Object3D): number | null {
+  obj.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = box.getSize(new THREE.Vector3());
+  if (Math.abs(size.x - size.z) > 0.15 * Math.max(size.x, size.z)) return null;
+  const v = new THREE.Vector3();
+  const xs: number[] = [];
+  const zs: number[] = [];
+  obj.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const pos = mesh.geometry.getAttribute("position");
+    if (!pos) return;
+    const step = Math.max(1, Math.floor(pos.count / 3000));
+    for (let i = 0; i < pos.count; i += step) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+      xs.push(v.x);
+      zs.push(v.z);
+    }
+  });
+  const n = xs.length;
+  if (n < 3) return null;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const mz = zs.reduce((a, b) => a + b, 0) / n;
+  let sxx = 0;
+  let szz = 0;
+  let sxz = 0;
+  for (let i = 0; i < n; i++) {
+    const x = xs[i] - mx;
+    const z = zs[i] - mz;
+    sxx += x * x;
+    szz += z * z;
+    sxz += x * z;
+  }
+  // major-axis angle from +x toward +z; rotating about y by (phi - pi/2) maps it onto +z
+  const phi = 0.5 * Math.atan2(2 * sxz, sxx - szz);
+  let yaw = phi - Math.PI / 2;
+  if (yaw > Math.PI / 2) yaw -= Math.PI;
+  if (yaw <= -Math.PI / 2) yaw += Math.PI;
+  return yaw;
+}
+
+/** After alignment, the bus's blue front cap tells which end is the nose. */
+function noseFlipByColor(obj: THREE.Object3D): number {
+  obj.updateMatrixWorld(true);
+  const v = new THREE.Vector3();
+  let blueZ = 0;
+  let blueN = 0;
+  let allZ = 0;
+  let allN = 0;
+  obj.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const pos = mesh.geometry.getAttribute("position");
+    if (!pos) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const blue = mats.some(isBlue);
+    const step = Math.max(1, Math.floor(pos.count / 3000));
+    for (let i = 0; i < pos.count; i += step) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+      allZ += v.z;
+      allN++;
+      if (blue) {
+        blueZ += v.z;
+        blueN++;
+      }
+    }
+  });
+  if (!blueN || !allN) return 0;
+  return blueZ / blueN < allZ / allN ? Math.PI : 0;
 }
 
 /** Scale/orient/ground a loaded scene to a drivable prototype. */
 function normalize(src: THREE.Object3D, len: number, yawFix: number, police = false, neutral = false): THREE.Group {
   const root = new THREE.Group();
   const inner = src.clone(true);
-  inner.rotation.y = yawFix;
+  const diag = diagonalYaw(inner);
+  inner.rotation.y = diag === null ? yawFix : diag;
   const wrap = new THREE.Group();
   wrap.add(inner);
+  wrap.updateMatrixWorld(true);
+  if (diag !== null) inner.rotation.y += noseFlipByColor(wrap);
   wrap.updateMatrixWorld(true);
   const bb = new THREE.Box3().setFromObject(wrap);
   const size = bb.getSize(new THREE.Vector3());
   const horizLen = Math.max(size.x, size.z);
   const scale = len / (horizLen || 1);
   wrap.scale.setScalar(scale);
-  // if the long axis is x, rotate so it runs along z (travel axis)
-  if (size.x > size.z) inner.rotation.y += Math.PI / 2;
+  // if the long axis is still x, rotate so it runs along z (travel axis)
+  if (diag === null && size.x > size.z) inner.rotation.y += Math.PI / 2;
   wrap.updateMatrixWorld(true);
   const bb2 = new THREE.Box3().setFromObject(wrap);
   wrap.position.y = -bb2.min.y;

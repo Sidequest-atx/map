@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { makeRef } from "../lib/format";
 import type { DriveSession, HazardReport, ReportStatus, WalkSession } from "../types";
 import { deleteIfExists, JsonDoc } from "./fs";
+import { getSession } from "./session";
 
 /**
  * Local-first ledger. Same interface and rules as the web app's ReportStore:
@@ -9,6 +10,8 @@ import { deleteIfExists, JsonDoc } from "./fs";
  *  - status only moves along STATUS_FLOW (or back to open on reopen)
  * No demo seeds on the phone: the map shows only what this device captured.
  * Photos live as files (see fs.ts); the ledger holds URIs, never pixels.
+ * Every capture is stamped with the account signed in at the time (ownerId),
+ * so a sibling signing in on the same phone never uploads someone else's reports.
  */
 export interface ReportStore {
   list(): HazardReport[];
@@ -27,6 +30,8 @@ export interface ReportStore {
   remove(id: string): void;
   /** Write sync bookkeeping without touching updatedAt or dirtyFields (so a push never re-dirties the row). */
   applySync(id: string, patch: Partial<HazardReport>): void;
+  /** Rows captured before owners were recorded go to the account syncing now (the first to sign in). */
+  claimLegacy(uid: string): void;
   tombstones(): Tombstone[];
   clearTombstone(clientId: string): void;
   subscribe(listener: () => void): () => void;
@@ -37,10 +42,12 @@ export interface Tombstone {
   /** Server uuid when the delete happened after a successful push */
   remoteId?: string;
   clientId: string;
+  /** Account that owned the report; only that account's session deletes it server-side */
+  ownerId?: string;
 }
 
 /** Local bookkeeping and media fields that never sync by themselves. */
-const SYNC_IRRELEVANT = new Set<string>(["photoUri", "thumbUri", "photoAssetId", "remoteId", "syncedAt", "dirtyFields", "rank", "updatedAt", "fix", "id", "ref", "walkId", "driveId", "createdAt", "source"]);
+const SYNC_IRRELEVANT = new Set<string>(["photoUri", "thumbUri", "photoAssetId", "remoteId", "syncedAt", "dirtyFields", "rank", "updatedAt", "fix", "id", "ref", "walkId", "driveId", "createdAt", "source", "ownerId"]);
 
 function markDirty(r: HazardReport, fields: string[]): string[] | undefined {
   const next = new Set(r.dirtyFields ?? []);
@@ -106,7 +113,7 @@ class LedgerStore implements ReportStore {
   }
 
   add(report: Omit<HazardReport, "ref"> & { ref?: string }): HazardReport {
-    const full: HazardReport = { ...report, ref: report.ref ?? this.nextRef() };
+    const full: HazardReport = { ...report, ownerId: report.ownerId ?? getSession()?.userId, ref: report.ref ?? this.nextRef() };
     this.reports.push(full);
     this.persist();
     return full;
@@ -114,13 +121,14 @@ class LedgerStore implements ReportStore {
 
   addMany(reports: (Omit<HazardReport, "ref"> & { ref?: string })[], session?: { drive?: DriveSession; walk?: WalkSession }): HazardReport[] {
     const out: HazardReport[] = [];
+    const ownerId = getSession()?.userId;
     let n = Number(this.nextRef().replace(/\D/g, ""));
     for (const r of reports) {
-      const full: HazardReport = { ...r, ref: r.ref ?? makeRef(n++) };
+      const full: HazardReport = { ...r, ownerId: r.ownerId ?? ownerId, ref: r.ref ?? makeRef(n++) };
       this.reports.push(full);
       out.push(full);
     }
-    if (session?.drive) this.driveSessions.push(session.drive);
+    if (session?.drive) this.driveSessions.push({ ...session.drive, ownerId: session.drive.ownerId ?? ownerId });
     if (session?.walk) this.walkSessions.push(session.walk);
     this.persist();
     return out;
@@ -181,7 +189,7 @@ class LedgerStore implements ReportStore {
     // Always tombstone: a delete during the first in-flight upload would
     // otherwise leave a ghost row on the shared map (the sync engine deletes
     // by client_id, a no-op if the row never landed).
-    this.tombstonesDoc.write([...this.tombstonesDoc.read(), { remoteId: r.remoteId, clientId: r.id }]);
+    this.tombstonesDoc.write([...this.tombstonesDoc.read(), { remoteId: r.remoteId, clientId: r.id, ownerId: r.ownerId }]);
     deleteIfExists(r.photoUri);
     deleteIfExists(r.thumbUri);
     deleteIfExists(r.afterPhotoUri);
@@ -196,6 +204,25 @@ class LedgerStore implements ReportStore {
     if (i < 0) return;
     this.reports[i] = { ...this.reports[i], ...patch };
     this.persist();
+  }
+
+  claimLegacy(uid: string) {
+    let changed = false;
+    for (let i = 0; i < this.reports.length; i++) {
+      if (!this.reports[i].ownerId) {
+        this.reports[i] = { ...this.reports[i], ownerId: uid };
+        changed = true;
+      }
+    }
+    for (let i = 0; i < this.driveSessions.length; i++) {
+      if (!this.driveSessions[i].ownerId) {
+        this.driveSessions[i] = { ...this.driveSessions[i], ownerId: uid };
+        changed = true;
+      }
+    }
+    const tombs = this.tombstonesDoc.read();
+    if (tombs.some((t) => !t.ownerId)) this.tombstonesDoc.write(tombs.map((t) => (t.ownerId ? t : { ...t, ownerId: uid })));
+    if (changed) this.persist();
   }
 
   /** Pending remote deletions (consumed by the sync engine on success). */

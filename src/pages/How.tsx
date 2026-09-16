@@ -1,12 +1,11 @@
 import { Link } from "react-router-dom";
 import { Lifecycle } from "../components/Bits";
-import { Motif } from "../components/Motif";
+import { DoorHanger } from "../components/DoorHanger";
 
 export default function How() {
   return (
     <>
-      <section className="section has-motif">
-        <Motif kind="crack" opacity={0.12} style={{ color: "var(--olive-800)" }} />
+      <section className="section">
         <div className="wrap split">
           <h1 className="h1">How a sidewalk gets fixed here.</h1>
           <p className="lede">
@@ -79,27 +78,11 @@ export default function How() {
               Print a sample
             </button>
           </div>
-          <div className="hanger" aria-label="Sample door-hanger">
-            <div className="hanger-hole" aria-hidden />
-            <h3>Your hedge is on the sidewalk.</h3>
-            <p>
-              Hi, neighbor. A walker photographed the sidewalk in front of this address and it is currently blocked by plants. People in wheelchairs,
-              with strollers, or with a cane have to step into the street here.
-            </p>
-            <p>
-              Austin code asks the adjacent property owner to keep the walk clear to its full width and to eight feet overhead. Trimming usually
-              takes twenty minutes.
-            </p>
-            <p>
-              <b>Need a hand?</b> Reply to this hanger by email and a volunteer crew will bring loppers on the next Saturday.
-            </p>
-            <p className="ref-line">Report SQ-0002 · sidequestatx.org/map?r=SQ-0002 · hello@sidequestatx.org</p>
-          </div>
+          <DoorHanger reportRef="SQ-0002" sample />
         </div>
       </section>
 
-      <section className="section section--band has-motif">
-        <Motif kind="root" opacity={0.12} style={{ color: "var(--olive-800)" }} />
+      <section className="section section--band">
         <div className="wrap stack stack--lg">
           <div className="split">
             <h2 className="h2">Who does what.</h2>

@@ -6,8 +6,15 @@ import { useEffect, type RefObject } from "react";
  * Apple-style: 1:1 tracking from the grab point, rubber-band above the rest
  * position, velocity projection on release to decide dismiss vs. settle, and
  * a critically damped spring (no bounce) back to rest. Interruptible: a new
- * pointerdown mid-spring takes over from the current transform.
+ * drag mid-spring takes over from the current transform.
+ *
+ * A press becomes a drag only after it moves a few pixels, and never when it
+ * starts on a link or button. Capturing the pointer on press stole the click
+ * from "Copy link", "Directions" and the app link for mouse and pen input.
  */
+const INTERACTIVE = "a[href], button, input, select, textarea, label, summary, [role='button'], [role='link']";
+const SLOP_PX = 6;
+
 export function useSheetDrag(ref: RefObject<HTMLElement | null>, handleRef: RefObject<HTMLElement | null>, onDismiss: () => void, enabled: boolean) {
   useEffect(() => {
     const el = ref.current;
@@ -19,7 +26,9 @@ export function useSheetDrag(ref: RefObject<HTMLElement | null>, handleRef: RefO
     let startY = 0;
     let grabY = 0;
     let raf = 0;
+    let pending = false; // pressed, not yet moved past the slop
     let dragging = false;
+    let pointerId = -1;
     const samples: { t: number; y: number }[] = [];
 
     const setY = (v: number) => {
@@ -37,7 +46,7 @@ export function useSheetDrag(ref: RefObject<HTMLElement | null>, handleRef: RefO
         return;
       }
       // critically damped spring, response ~0.32s
-      const omega = 2 * Math.PI / 0.32;
+      const omega = (2 * Math.PI) / 0.32;
       let pos = y;
       let vel = v0;
       let last = performance.now();
@@ -60,21 +69,39 @@ export function useSheetDrag(ref: RefObject<HTMLElement | null>, handleRef: RefO
     };
 
     const onDown = (e: PointerEvent) => {
-      if (e.button !== 0) return;
+      if (e.button !== 0 || pending || dragging) return;
+      const target = e.target as Element | null;
+      const fromHandle = !!target && handle.contains(target);
+      // Presses on controls stay clicks.
+      if (!fromHandle && target?.closest?.(INTERACTIVE)) return;
       // Only drag from the handle, or from the body when it's scrolled to top.
       const scroller = el.querySelector<HTMLElement>(".detail-scroll");
-      const fromHandle = handle.contains(e.target as Node);
       if (!fromHandle && scroller && scroller.scrollTop > 0) return;
+      pending = true;
+      pointerId = e.pointerId;
+      grabY = e.clientY;
+    };
+    const beginDrag = (e: PointerEvent) => {
+      pending = false;
       dragging = true;
       cancelAnimationFrame(raf);
       startY = y;
       grabY = e.clientY;
       samples.length = 0;
       samples.push({ t: e.timeStamp, y: e.clientY });
-      handle.setPointerCapture(e.pointerId);
+      try {
+        handle.setPointerCapture(pointerId);
+      } catch {
+        /* pointer already gone */
+      }
       el.style.transition = "none";
     };
     const onMove = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId) return;
+      if (pending) {
+        if (Math.abs(e.clientY - grabY) < SLOP_PX) return;
+        beginDrag(e);
+      }
       if (!dragging) return;
       const h = el.getBoundingClientRect().height;
       let next = startY + (e.clientY - grabY);
@@ -84,6 +111,12 @@ export function useSheetDrag(ref: RefObject<HTMLElement | null>, handleRef: RefO
       if (samples.length > 6) samples.shift();
     };
     const onUp = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId) return;
+      if (pending) {
+        // A tap, not a drag: let the click land on whatever was pressed.
+        pending = false;
+        return;
+      }
       if (!dragging) return;
       dragging = false;
       try {

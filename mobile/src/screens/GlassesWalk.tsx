@@ -1,6 +1,7 @@
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useKeepAwake } from "expo-keep-awake";
+import * as Linking from "expo-linking";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { collapseBatch, findDuplicates, likelyDuplicate } from "../ai/dedup";
@@ -33,10 +34,18 @@ interface Candidate extends WalkPhoto {
 export function GlassesWalkScreen({ navigation }: ScreenProps<"GlassesWalk">) {
   const session = useSession();
   const prefs = usePrefs();
-  const [phase, setPhase] = useState<Phase>(() => (getActiveWalk() ? "walking" : "idle"));
+  // An ended walk whose photos were never imported reopens in review, not on "Walking.".
+  const [phase, setPhase] = useState<Phase>(() => {
+    const w = getActiveWalk();
+    return w ? (w.endedAt ? "finding" : "walking") : "idle";
+  });
   const [walk, setWalk] = useState<ActiveWalk | null>(() => getActiveWalk());
   const [trail, setTrail] = useState<TrailPoint[]>(() => readTrail());
-  const [endedAt, setEndedAt] = useState<number | null>(null);
+  const [endedAt, setEndedAt] = useState<number | null>(() => {
+    const w = getActiveWalk();
+    return w?.endedAt ? new Date(w.endedAt).getTime() : null;
+  });
+  const [findNeedsSettings, setFindNeedsSettings] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [findNote, setFindNote] = useState<string | null>(null);
@@ -71,7 +80,16 @@ export function GlassesWalkScreen({ navigation }: ScreenProps<"GlassesWalk">) {
     if (!session) return;
     const res = await startWalk(session.name, uuid());
     if (!res.ok) {
-      Alert.alert("Could not start", res.reason);
+      Alert.alert(
+        "Could not start",
+        res.reason,
+        res.needsSettings
+          ? [
+              { text: "Cancel", style: "cancel" },
+              { text: "Open Settings", onPress: () => void Linking.openSettings() },
+            ]
+          : undefined,
+      );
       return;
     }
     setWalk(res.walk);
@@ -84,11 +102,13 @@ export function GlassesWalkScreen({ navigation }: ScreenProps<"GlassesWalk">) {
   }
 
   async function end() {
-    const { trail: t } = await stopWalk();
+    const { trail: t, walk: w } = await stopWalk();
+    const endMs = w?.endedAt ? new Date(w.endedAt).getTime() : Date.now();
+    if (w) setWalk(w);
     setTrail(t);
-    setEndedAt(Date.now());
+    setEndedAt(endMs);
     setPhase("finding");
-    await findPhotos(t, Date.now());
+    await findPhotos(t, endMs);
   }
 
   const findPhotos = useCallback(
@@ -97,6 +117,7 @@ export function GlassesWalkScreen({ navigation }: ScreenProps<"GlassesWalk">) {
       setFindNote(null);
       const startMs = new Date(walk.startedAt).getTime();
       const res = await findWalkPhotos(t, { startMs, endMs }, getPrefs().glassesClockOffsetS);
+      setFindNeedsSettings(!res.ok && Boolean(res.needsSettings));
       if (!res.ok) {
         setFindNote(res.reason);
         setCandidates([]);
@@ -113,6 +134,12 @@ export function GlassesWalkScreen({ navigation }: ScreenProps<"GlassesWalk">) {
     },
     [walk],
   );
+
+  // A walk that was ended but never imported reopens straight into review.
+  useEffect(() => {
+    if (walk?.endedAt) void findPhotos(readTrail(), new Date(walk.endedAt).getTime());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function pickManually() {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: true, selectionLimit: 0, exif: true, quality: 1, orderedSelection: true });
@@ -352,7 +379,12 @@ export function GlassesWalkScreen({ navigation }: ScreenProps<"GlassesWalk">) {
                 : "Open the Meta AI app so the glasses captures import to the camera roll, then search again. Or pick them by hand."}
             </P>
           </View>
-          {findNote ? <Notice tone="warn">{findNote}</Notice> : null}
+          {findNote ? (
+            <Notice tone="warn">
+              <P>{findNote}</P>
+              {findNeedsSettings ? <Button title="Open Settings" size="sm" onPress={() => void Linking.openSettings()} /> : null}
+            </Notice>
+          ) : null}
           <Row gap={SP.sm} align="stretch">
             <KPI value={miles.toFixed(2)} label="miles walked" />
             <KPI value={String(trail.length)} label="breadcrumbs" />

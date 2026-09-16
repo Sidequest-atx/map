@@ -1,7 +1,9 @@
 import * as Haptics from "expo-haptics";
-import React, { type ReactNode } from "react";
+import React, { type ReactNode, type Ref } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,9 +22,33 @@ import { SEVERITY_LABELS, STATUS_LABELS, type ReportStatus, type Severity } from
 
 /* ---------- Layout ---------- */
 
-export function Screen({ children, scroll = true, padded = true, style, bottom }: { children: ReactNode; scroll?: boolean; padded?: boolean; style?: StyleProp<ViewStyle>; bottom?: ReactNode }) {
+export function Screen({
+  children,
+  scroll = true,
+  padded = true,
+  style,
+  bottom,
+  avoidKeyboard,
+}: {
+  children: ReactNode;
+  scroll?: boolean;
+  padded?: boolean;
+  style?: StyleProp<ViewStyle>;
+  bottom?: ReactNode;
+  /** Keep the bottom bar above the keyboard on screens with text fields (inside a stack, under its header) */
+  avoidKeyboard?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const inner = padded ? { padding: SP.lg, paddingBottom: SP.xxl + insets.bottom } : { paddingBottom: insets.bottom };
+  if (avoidKeyboard) {
+    return (
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={insets.top + 44}>
+        <Screen scroll={scroll} padded={padded} style={style} bottom={bottom}>
+          {children}
+        </Screen>
+      </KeyboardAvoidingView>
+    );
+  }
   return (
     <View style={[styles.screen, style]}>
       {scroll ? (
@@ -106,11 +132,19 @@ export function Button({
   const bg = variant === "primary" ? C.olive600 : variant === "dark" ? C.olive800 : variant === "danger" ? C.danger : variant === "ghost" ? "transparent" : C.surface;
   const fg = variant === "primary" || variant === "dark" || variant === "danger" ? C.inkOnDark : variant === "ghost" ? C.olive800 : C.ink;
   const border = variant === "default" ? C.line : "transparent";
-  const pad = size === "sm" ? { paddingVertical: 7, paddingHorizontal: 12 } : size === "lg" ? { paddingVertical: 15, paddingHorizontal: 22 } : { paddingVertical: 11, paddingHorizontal: 16 };
+  // md and lg meet Apple's 44 pt default on their own; sm stays visually compact
+  // and gets its touch target from hitSlop (36 + 4 + 4).
+  const pad =
+    size === "sm"
+      ? { paddingVertical: 7, paddingHorizontal: 12, minHeight: 36 }
+      : size === "lg"
+        ? { paddingVertical: 15, paddingHorizontal: 22, minHeight: 48 }
+        : { paddingVertical: 11, paddingHorizontal: 16, minHeight: 44 };
   const fs = size === "sm" ? 13.5 : size === "lg" ? 17 : 15.5;
   return (
     <Pressable
       accessibilityRole="button"
+      hitSlop={size === "sm" ? 4 : undefined}
       disabled={disabled || loading}
       onPress={() => {
         if (haptic) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -162,7 +196,7 @@ export function Badge({ children, tone = "field" }: { children: ReactNode; tone?
 
 export function Chip({ label, on, onPress }: { label: string; on?: boolean; onPress?: () => void }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, on ? styles.chipOn : null]} accessibilityRole="button" accessibilityState={{ selected: on }}>
+    <Pressable onPress={onPress} hitSlop={4} style={[styles.chip, on ? styles.chipOn : null]} accessibilityRole="button" accessibilityState={{ selected: on }}>
       <Text style={[styles.chipText, on ? { color: C.inkOnDark } : null]}>{label}</Text>
     </Pressable>
   );
@@ -191,8 +225,9 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   );
 }
 
-export function Input(props: TextInputProps) {
-  return <TextInput placeholderTextColor={C.inkMute} {...props} style={[styles.input, props.multiline ? { minHeight: 96, textAlignVertical: "top" } : null, props.style]} />;
+/** React 19 passes `ref` as a prop, so the keyboard's Next key can focus the next field. */
+export function Input({ ref, ...props }: TextInputProps & { ref?: Ref<TextInput> }) {
+  return <TextInput ref={ref} placeholderTextColor={C.inkMute} {...props} style={[styles.input, props.multiline ? { minHeight: 96, textAlignVertical: "top" } : null, props.style]} />;
 }
 
 export function Segmented<K extends string>({ options, value, onChange }: { options: { key: K; label: string }[]; value: K; onChange: (k: K) => void }) {
@@ -201,7 +236,7 @@ export function Segmented<K extends string>({ options, value, onChange }: { opti
       {options.map((o) => {
         const on = o.key === value;
         return (
-          <Pressable key={o.key} onPress={() => onChange(o.key)} style={[styles.segItem, on ? styles.segOn : null]} accessibilityRole="radio" accessibilityState={{ checked: on }}>
+          <Pressable key={o.key} onPress={() => onChange(o.key)} hitSlop={3} style={[styles.segItem, on ? styles.segOn : null]} accessibilityRole="radio" accessibilityState={{ checked: on }}>
             <Text style={[styles.segText, on ? { color: C.inkOnDark } : null]}>{o.label}</Text>
           </Pressable>
         );
@@ -288,13 +323,13 @@ const styles = StyleSheet.create({
   btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: R.md, borderWidth: 1 },
   badge: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3, paddingHorizontal: 9, borderRadius: R.pill, alignSelf: "flex-start" },
   badgeText: { fontSize: 12.5, fontWeight: "600", color: C.ink },
-  chip: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: R.pill, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line },
+  chip: { minHeight: 36, justifyContent: "center", paddingVertical: 7, paddingHorizontal: 12, borderRadius: R.pill, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line },
   chipOn: { backgroundColor: C.olive800, borderColor: C.olive800 },
   chipText: { fontSize: 13.5, fontWeight: "600", color: C.ink },
   notice: { flexDirection: "row", gap: SP.md, padding: SP.md, borderRadius: R.md },
   input: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.line, borderRadius: R.md, paddingHorizontal: 12, paddingVertical: 11, fontSize: 16, color: C.ink },
   seg: { flexDirection: "row", backgroundColor: C.field3, borderRadius: R.md, padding: 3 },
-  segItem: { flex: 1, paddingVertical: 8, alignItems: "center", borderRadius: R.sm },
+  segItem: { flex: 1, minHeight: 38, justifyContent: "center", paddingVertical: 8, alignItems: "center", borderRadius: R.sm },
   segOn: { backgroundColor: C.olive800 },
   segText: { fontSize: 13.5, fontWeight: "600", color: C.ink },
   option: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.line, borderRadius: R.md, padding: 12, gap: 3 },

@@ -6,12 +6,26 @@
  */
 import * as THREE from "three";
 import { rng } from "./rng";
+import { initialTier } from "../quality";
+
+/** Logical texture dims for the draw currently running (helpers read these —
+    the physical canvas is supersampled SS× behind a ctx.scale). */
+let TEXW = 0;
+let TEXH = 0;
+/** Supersample: every texture is painted at 2× its authored coordinates, so
+    surfaces stay detailed when the camera dips close. Draw code is untouched.
+    The low tier (phones) renders at ≤1.3 DPR and can't show those texels, and
+    2× is 4× the paint and upload work, so it paints at authored size. */
+const SS = initialTier() === "low" ? 1 : 2;
 
 function makeTex(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void, opts?: { repeat?: boolean }) {
   const c = document.createElement("canvas");
-  c.width = w;
-  c.height = h;
+  c.width = w * SS;
+  c.height = h * SS;
   const ctx = c.getContext("2d")!;
+  ctx.scale(SS, SS);
+  TEXW = w;
+  TEXH = h;
   draw(ctx);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -19,7 +33,7 @@ function makeTex(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => 
     t.wrapS = THREE.RepeatWrapping;
     t.wrapT = THREE.RepeatWrapping;
   }
-  t.anisotropy = 4;
+  t.anisotropy = 16;
   return t;
 }
 
@@ -45,8 +59,8 @@ function speckle(
   maxR: number,
   alpha = 1,
 ) {
-  const w = ctx.canvas.width;
-  const h = ctx.canvas.height;
+  const w = TEXW;
+  const h = TEXH;
   for (let i = 0; i < count; i++) {
     ctx.fillStyle = colors[Math.floor(r() * colors.length)];
     ctx.globalAlpha = alpha * (0.35 + r() * 0.65);
@@ -64,8 +78,8 @@ function speckle(
 }
 
 function blotches(ctx: CanvasRenderingContext2D, r: () => number, count: number, colors: string[], minR: number, maxR: number, alpha: number) {
-  const w = ctx.canvas.width;
-  const h = ctx.canvas.height;
+  const w = TEXW;
+  const h = TEXH;
   for (let i = 0; i < count; i++) {
     const rad = minR + r() * (maxR - minR);
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rad);
@@ -105,8 +119,12 @@ function concreteTex() {
     const r = rng(202);
     ctx.fillStyle = "#c9c2b2";
     ctx.fillRect(0, 0, 512, 512);
-    blotches(ctx, r, 22, ["#bfb7a5", "#d2ccbc", "#b7ae9a"], 50, 150, 0.5);
-    speckle(ctx, r, 4200, ["#b3ab99", "#d6d0c1", "#a89f8c", "#ddd7c9"], 0.4, 1.3);
+    // Kept faint: one texture covers a whole slab face, so a bold blotch is a
+    // 30cm grey smudge once the camera is down on the panel. Panel-to-panel
+    // variation comes from the per-slab vertex tint instead.
+    blotches(ctx, r, 16, ["#bfb7a5", "#d2ccbc", "#b7ae9a"], 40, 120, 0.26);
+    speckle(ctx, r, 6000, ["#b3ab99", "#d6d0c1", "#a89f8c", "#ddd7c9"], 0.4, 1.3);
+    speckle(ctx, r, 900, ["#9a9280", "#e2ddd0"], 1.1, 2.2, 0.45); // aggregate
     // faint trowel drag
     ctx.globalAlpha = 0.05;
     ctx.strokeStyle = "#8f8775";
@@ -123,15 +141,38 @@ function concreteTex() {
 
 function grassTex() {
   // Austin lawn in late summer, graded toward the site's olive: warm,
-  // slightly dried, never golf-course green.
+  // slightly dried, never golf-course green. Grain is short directional
+  // blade strokes — round speckles read as dithered polka dots from the
+  // aerial camera.
   return makeTex(512, 512, (ctx) => {
     const r = rng(303);
     ctx.fillStyle = "#6f7a44";
     ctx.fillRect(0, 0, 512, 512);
-    blotches(ctx, r, 34, ["#5f6b3a", "#7d8a4d", "#57633a", "#868c52"], 40, 140, 0.55);
-    // dry patches
-    blotches(ctx, r, 14, ["#9c945e", "#a89e66", "#8f8a58"], 24, 78, 0.45);
-    speckle(ctx, r, 2600, ["#525f34", "#7c8a4c", "#66743f", "#918f56"], 0.5, 1.5, 0.8);
+    // Mottle stays FAINT: anything bold repeats as a visible grid once the
+    // camera rises (worst at night). Variation comes from blade grain + light.
+    blotches(ctx, r, 10, ["#5f6b3a", "#7d8a4d", "#57633a", "#868c52"], 90, 220, 0.16);
+    // dry patches, soft
+    blotches(ctx, r, 6, ["#9c945e", "#a89e66", "#8f8a58"], 46, 110, 0.12);
+    // blade grain: fine strokes with a loose shared lean
+    const colors = ["#525f34", "#7c8a4c", "#66743f", "#8a8a52"];
+    ctx.lineCap = "round";
+    for (let i = 0; i < 4200; i++) {
+      const x = r() * 512;
+      const y = r() * 512;
+      const a = -1.15 + (r() - 0.5) * 0.9; // mostly upward lean
+      const len = 2.5 + r() * 4;
+      ctx.strokeStyle = colors[Math.floor(r() * colors.length)];
+      ctx.globalAlpha = 0.22 + r() * 0.3;
+      ctx.lineWidth = 0.6 + r() * 0.7;
+      const wrap = x < 8 || y < 8 || x > 504 || y > 504 ? WRAP : WRAP.slice(0, 1);
+      for (const [ox, oy] of wrap) {
+        ctx.beginPath();
+        ctx.moveTo(x + ox * 512, y + oy * 512);
+        ctx.lineTo(x + ox * 512 + Math.cos(a) * len, y + oy * 512 + Math.sin(a) * len);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
   });
 }
 
@@ -327,6 +368,136 @@ function crackAtlasTex() {
   );
 }
 
+/* ---------- the same cracks, drawn at true width for close beats ----------
+   The atlas above is deliberately exaggerated so a break still reads from an
+   aerial camera. At a metre away that exaggeration is a black caterpillar, so
+   a second atlas carries the same 4x4 layout drawn honestly: a narrow break,
+   spalled shoulders, exposed aggregate. Same geometry, same cells - only the
+   material swaps, crossfaded by how tight the shot is. */
+
+function crackPath(r: () => number, cx: number, cy: number, cell: number) {
+  const span = cell * (0.6 + r() * 0.25);
+  const steps = 20 + Math.floor(r() * 10);
+  let x = cx - span / 2;
+  let y = cy + (r() - 0.5) * cell * 0.3;
+  let a = (r() - 0.5) * 0.5;
+  const pts: [number, number][] = [[x, y]];
+  for (let i = 0; i < steps; i++) {
+    if (r() < 0.14) a += (r() < 0.5 ? -1 : 1) * (0.5 + r() * 0.7);
+    else a += (r() - 0.5) * 0.55;
+    a = Math.max(-1.1, Math.min(1.1, a));
+    const l = (span / steps) * (0.7 + r() * 0.7);
+    x += Math.cos(a) * l;
+    y += Math.sin(a) * l;
+    y = Math.max(cy - cell * 0.4, Math.min(cy + cell * 0.4, y));
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+function drawCrackNear(ctx: CanvasRenderingContext2D, r: () => number, cx: number, cy: number, cell: number) {
+  const pts = crackPath(r, cx, cy, cell);
+  const taper = (i: number) => Math.sin((Math.PI * i) / pts.length);
+  const seg = (i: number, w: number, style: string, ox = 0, oy = 0) => {
+    ctx.strokeStyle = style;
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.moveTo(pts[i - 1][0] + ox, pts[i - 1][1] + oy);
+    ctx.lineTo(pts[i][0] + ox, pts[i][1] + oy);
+    ctx.stroke();
+  };
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  // concrete roughened either side of the break
+  for (let i = 1; i < pts.length; i++) seg(i, 4 + 8 * taper(i), "rgba(150,142,124,0.20)");
+  // the lit shoulder, hairline
+  for (let i = 1; i < pts.length; i++) seg(i, 1 + 1.2 * taper(i), "rgba(246,241,228,0.45)", -1.1, -1.4);
+  // the break: narrow, dark, never pure black
+  for (let i = 1; i < pts.length; i++) {
+    const w = Math.max(0.8, 2 + r() * 1.1 + 3.6 * taper(i));
+    seg(i, w, "rgba(46,41,32,0.90)");
+    seg(i, w * 0.4, "rgba(18,15,11,0.85)");
+  }
+  // hairline branches
+  for (let k = 0; k < 3 + r() * 3; k++) {
+    let [bx, by] = pts[2 + Math.floor(r() * (pts.length - 4))];
+    let ba = r() * Math.PI * 2;
+    ctx.strokeStyle = "rgba(58,52,41,0.6)";
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    for (let j = 0; j < 3 + r() * 4; j++) {
+      ba += (r() - 0.5) * 0.7;
+      bx += Math.cos(ba) * (4 + r() * 7);
+      by += Math.sin(ba) * (4 + r() * 7);
+      ctx.lineTo(bx, by);
+    }
+    ctx.stroke();
+  }
+  // aggregate the break has exposed
+  for (let k = 0; k < 26; k++) {
+    const [px, py] = pts[Math.floor(r() * pts.length)];
+    ctx.fillStyle = r() < 0.5 ? "rgba(196,188,170,0.5)" : "rgba(96,88,72,0.45)";
+    ctx.beginPath();
+    ctx.arc(px + (r() - 0.5) * 11, py + (r() - 0.5) * 11, 0.7 + r() * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawPotholeNear(ctx: CanvasRenderingContext2D, r: () => number, cx: number, cy: number, cell: number) {
+  const R = cell * (0.2 + r() * 0.08);
+  const blob = (scale: number, ox: number, oy: number, fill: string) => {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    const nV = 15;
+    for (let i = 0; i < nV; i++) {
+      const th = (i / nV) * Math.PI * 2;
+      const rad = R * scale * (0.76 + r() * 0.42);
+      const px = cx + ox + Math.cos(th) * rad;
+      const py = cy + oy + Math.sin(th) * rad;
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  };
+  blob(1.3, 0, 0, "rgba(156,147,128,0.42)"); // spalled shoulder
+  blob(1.0, R * 0.08, R * 0.08, "rgba(74,67,55,0.8)");
+  blob(0.58, R * 0.18, R * 0.15, "rgba(30,26,20,0.85)");
+  ctx.strokeStyle = "rgba(240,234,218,0.35)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(cx - R * 0.12, cy - R * 0.12, R * 0.98, Math.PI * 0.9, Math.PI * 1.75);
+  ctx.stroke();
+  for (let k = 0; k < 40; k++) {
+    ctx.fillStyle = r() < 0.45 ? "rgba(198,190,172,0.55)" : "rgba(88,80,64,0.5)";
+    const th = r() * Math.PI * 2;
+    const rr = R * (0.3 + r() * 1.15);
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(th) * rr, cy + Math.sin(th) * rr, 0.8 + r() * 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function crackAtlasNearTex() {
+  const size = 1024;
+  const cell = size / ATLAS_N;
+  return makeTex(
+    size,
+    size,
+    (ctx) => {
+      ctx.clearRect(0, 0, size, size);
+      const r = rng(777); // same seed, so a cell stays recognisably one crack
+      for (let i = 0; i < ATLAS_N * ATLAS_N; i++) {
+        const cx = (i % ATLAS_N) * cell + cell / 2;
+        const cy = Math.floor(i / ATLAS_N) * cell + cell / 2;
+        if (i < 12) drawCrackNear(ctx, r, cx, cy, cell * 0.86);
+        else drawPotholeNear(ctx, r, cx, cy, cell * 0.86);
+      }
+    },
+    { repeat: false },
+  );
+}
+
 /* ---------- downtown facades (day albedo + night emissive) ---------- */
 
 export const FACADE_STYLES = 4;
@@ -506,6 +677,7 @@ export function buildWorldLib() {
     granite: graniteTex(),
     water: waterTex(),
     crackAtlas: crackAtlasTex(),
+    crackAtlasNear: crackAtlasNearTex(),
     facadeDay: facadeTex(false),
     facadeNight: facadeTex(true),
     towerDay: towerTex(false),
@@ -550,6 +722,17 @@ export function buildWorldLib() {
     cracks: std({
       map: tex.crackAtlas,
       transparent: true,
+      depthWrite: false,
+      roughness: 0.95,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    }),
+    /** the same decals at true width, faded in when the camera comes close */
+    cracksNear: std({
+      map: tex.crackAtlasNear,
+      transparent: true,
+      opacity: 0,
       depthWrite: false,
       roughness: 0.95,
       polygonOffset: true,

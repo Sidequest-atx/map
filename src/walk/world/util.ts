@@ -61,7 +61,9 @@ export class GeoBatch {
   private geos: THREE.BufferGeometry[] = [];
 
   add(geo: THREE.BufferGeometry, matrix?: THREE.Matrix4, color?: THREE.ColorRepresentation) {
-    const g = geo.clone();
+    // toNonIndexed() already returns a fresh copy, so indexed parts skip the
+    // clone (build() needs them non-indexed anyway).
+    const g = geo.index ? geo.toNonIndexed() : geo.clone();
     if (matrix) g.applyMatrix4(matrix);
     if (color !== undefined) tint(g, color);
     this.geos.push(g);

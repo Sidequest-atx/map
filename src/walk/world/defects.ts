@@ -42,6 +42,8 @@ export const CRACKS: CrackSpot[] = (() => {
       scale: (hot ? 0.95 : suburb ? 0.88 : 0.78) + r() * (suburb ? 0.55 : 0.5),
     });
   }
+  // The camera comes right down on this one; it must not be left to chance.
+  out.push({ f: BEATS.broken, cell: 5, yaw: 0.22, scale: 1.35 });
   return out;
 })();
 
@@ -69,6 +71,8 @@ export const MILD_HEAVES: Heave[] = [
   { f: 0.755, lift: 0.055, tiltX: -2.5, tiltZ: 1.0, slabs: 1 },
   // the lip that gets its legal name at the precedent beat
   { f: 0.79, lift: 0.065, tiltX: 2.8, tiltZ: -0.9, slabs: 1 },
+  // the panel the camera lands on at the "failing the test" beat
+  { f: BEATS.broken, lift: 0.075, tiltX: 3.6, tiltZ: -1.1, slabs: 1 },
 ];
 
 /** THE root heave: the oak, the lifted panel, the fall. */

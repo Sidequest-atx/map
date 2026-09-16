@@ -1,31 +1,20 @@
-﻿import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { motion, useAnimationFrame, useMotionValueEvent, useReducedMotion, useScroll, type MotionValue } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { CountUp } from "../components/CountUp";
-import DiveMap from "../components/DiveMap";
-import { FallTicker } from "../components/FallTicker";
-import { Motif } from "../components/Motif";
-import { WalkExperience } from "../walk";
+import { Still } from "../components/Media";
 import { useReports } from "../data/store";
 import { fmtInt } from "../lib/format";
-import { staticMapUrl, useMapboxToken } from "../lib/mapbox";
+import { MEDIA, type StillId } from "../lib/media";
+import { staticMapUrl, useMapboxToken } from "../lib/mapToken";
 
 /**
- * The landing is a narrated report: one researched fact per viewport on the
- * left, and one continuous engineering drawing of a sidewalk on the right
- * that degrades in lockstep with the story. The scroll ends by diving the
- * camera into the live map. Every figure is the City's, the CDC's, a
- * journal's, or a court's; derived arithmetic is labeled where it sits.
+ * The landing: a photo-led civic page in the institutional grammar of a
+ * university homepage. A rendered hero, three ways a sidewalk fails, the
+ * City's own numbers in alternating image-and-text sections, the live count,
+ * and how a report becomes a proven fix. Every figure is the City's, the
+ * CDC's, a journal's, or a court's; derived arithmetic is labeled where it sits.
  */
-
-const CHAPTERS = [
-  { id: "missing", label: "Never built" },
-  { id: "broken", label: "Failing" },
-  { id: "math", label: "The math" },
-  { id: "falls", label: "The falls" },
-  { id: "precedent", label: "The precedent" },
-  { id: "count", label: "The count" },
-] as const;
 
 const PLAN_URL = "https://www.austintexas.gov/transportation-public-works/sidewalks-crossings-and-shared-streets-plan";
 const CDC_URL = "https://www.cdc.gov/falls/data-research/facts-stats/index.html";
@@ -36,85 +25,9 @@ const NHTSA_URL = "https://www.nhtsa.gov/press-releases/nhtsa-estimates-39345-tr
 const SBC_URL = "https://www.tandfonline.com/doi/full/10.1080/01441647.2022.2055674";
 const NCOA_URL = "https://www.ncoa.org/article/get-the-facts-on-falls-prevention/";
 
-function useActiveSection(ids: string[]) {
-  const [active, setActive] = useState<string | null>(null);
-  useEffect(() => {
-    const obs = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) if (e.isIntersecting) setActive(e.target.id);
-      },
-      { rootMargin: "-45% 0px -45% 0px" },
-    );
-    for (const id of ids) {
-      const el = document.getElementById(id);
-      if (el) obs.observe(el);
-    }
-    return () => obs.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return active;
-}
-
 export default function Mission() {
   const reports = useReports();
-  const { token: mapboxToken } = useMapboxToken();
-  const reduced = useReducedMotion();
-
-  const active = useActiveSection(["prologue", ...CHAPTERS.map((c) => c.id), "finale"]);
-  const chapterIndex = CHAPTERS.findIndex((c) => c.id === active);
-
-  // The walk: one scroll progress across the whole story drives the canvas.
-  const storyRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress: walkProgress } = useScroll({ target: storyRef, offset: ["start 0.65", "end 0.92"] });
-
-  // The drone prologue. Auto mode (default): the flyover plays on the clock
-  // over the prologue viewport and scroll owns only the descent (the
-  // prologue's exit). Scrub mode (?scrub=1): the prologue is a tall sticky
-  // track and scroll owns every beat. Both are built — James decides.
-  const scrub = useMemo(() => typeof location !== "undefined" && location.search.includes("scrub"), []);
-  const prologueRef = useRef<HTMLElement>(null);
-  const { scrollYProgress: prologueScroll } = useScroll({
-    target: prologueRef,
-    offset: scrub ? ["start start", "end end"] : ["start start", "end 0.75"],
-  });
-  // Mobile mounts one WebGL instance at a time: full-bleed behind the
-  // prologue copy, then the classic sticky strip once the story begins.
-  const [mobileStage, setMobileStage] = useState<"prologue" | "story">("prologue");
-  useMotionValueEvent(prologueScroll, "change", (v) => {
-    setMobileStage((s) => (v > 0.985 ? "story" : v < 0.7 ? "prologue" : s));
-  });
-
-  // The finale's scroll drives the camera rise, the canvas-to-map crossfade,
-  // and the map's pull-back — one timeline, owned here.
-  const finaleRef = useRef<HTMLElement>(null);
-  const { scrollYProgress: finaleScroll } = useScroll({ target: finaleRef, offset: ["start end", "end end"] });
-  // The canvas-to-map crossfade, written imperatively each frame — the
-  // subscription path proved unreliable for this value, polling is not.
-  const canvasLayerRef = useRef<HTMLDivElement>(null);
-  useAnimationFrame(() => {
-    const el = canvasLayerRef.current;
-    if (!el) return;
-    const v = finaleScroll.get();
-    const o = v <= 0.55 ? 1 : v >= 0.85 ? 0 : 1 - (v - 0.55) / 0.3;
-    el.style.opacity = o.toFixed(3);
-    el.style.visibility = o < 0.01 ? "hidden" : "visible";
-  });
-
-  // One WebGL context: the canvas mounts either as the desktop full-bleed
-  // layer or inside the mobile strip, never both.
-  const [desktop, setDesktop] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(min-width: 1024px)").matches);
-  useEffect(() => {
-    const mq = matchMedia("(min-width: 1024px)");
-    const on = () => setDesktop(mq.matches);
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-
-  // Mount the live dive map a beat before the reader reaches it.
-  const [mapArmed, setMapArmed] = useState(false);
-  useEffect(() => {
-    if (!mapArmed && (chapterIndex >= 2 || active === "finale")) setMapArmed(true);
-  }, [chapterIndex, active, mapArmed]);
+  const { token } = useMapboxToken();
 
   const live = useMemo(() => {
     const real = reports.filter((r) => !r.duplicateOf);
@@ -126,469 +39,428 @@ export default function Mission() {
   }, [reports]);
 
   const mapUrl = useMemo(
-    () => (mapboxToken ? staticMapUrl(reports.filter((r) => r.status !== "resolved").slice(0, 60), 1280, 960) : null),
-    [reports, mapboxToken],
+    () => (token ? staticMapUrl(reports.filter((r) => r.status !== "resolved").slice(0, 60), 1280, 960) : null),
+    [reports, token],
   );
 
   return (
     <>
-      <ChapterRail active={active} reduced={reduced} />
+      <Hero />
 
-      {/* ---- Prologue: the drone's Austin, with the question nobody can
-              answer over it. The 3D flyover plays behind this copy; a scrim
-              keeps the words readable over a daylight sky. ---- */}
-      <section ref={prologueRef} id="prologue" className={scrub ? "has-motif relative z-10 h-[400vh]" : "has-motif relative z-10"}>
-        <div
-          className={
-            "relative grid content-center overflow-hidden text-ink-on-dark " +
-            (scrub
-              ? "sticky top-[var(--topbar-h)] h-[calc(100dvh-var(--topbar-h))]"
-              : "min-h-[calc(100dvh-var(--topbar-h))]")
-          }
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-olive-900/85 via-olive-900/45 to-olive-900/5" aria-hidden />
-          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-olive-900/55 to-transparent" aria-hidden />
-          <Motif kind="crack" opacity={0.1} style={{ color: "var(--olive-400)" }} />
-          <div className="wrap relative pb-16">
-            <p className="font-sans text-[11px] font-semibold tracking-[0.14em] text-ink-on-dark-soft uppercase">
-              SideQuest ATX · Northwest Austin
-            </p>
-            <h1 className="mt-4 max-w-3xl font-serif text-[clamp(2.2rem,4.8vw,3.5rem)] leading-[1.08] font-bold tracking-[-0.02em] text-balance">
-              Austin knows its sidewalks by the mile. Nobody knows them by the panel.
-            </h1>
-            <Rise delay={0.6}>
-              <p className="mt-6 font-serif text-[clamp(1.4rem,2.6vw,2rem)] italic">
-                And everything that matters happens on a panel.
-              </p>
-            </Rise>
-            <Rise delay={1.1}>
-              <p className="mt-5 max-w-xl font-sans text-[0.95rem] leading-relaxed text-ink-on-dark-soft">
-                The City can price the entire fix and still can't name the slab that breaks the next hip. This page is
-                one walk down that gap. Every number on it is the City's, the CDC's, or a federal court's.
-              </p>
-            </Rise>
-          </div>
-          <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2" aria-hidden>
-            <span className="font-sans text-[10px] tracking-[0.2em] text-ink-on-dark-soft uppercase">Scroll</span>
-            <motion.span
-              className="block h-9 w-px origin-top bg-ink-on-dark-soft/70"
-              animate={reduced ? undefined : { scaleY: [0.15, 1, 0.15] }}
-              transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
+      {/* Three ways a sidewalk fails, as the camera found them. */}
+      <section className="band band--deep" aria-labelledby="stories-title">
+        <div className="wrap">
+          <h2 id="stories-title" className="sr-only">
+            The gap, panel by panel
+          </h2>
+          <div className="stories">
+            <Story href="#missing" id="neverBuilt" title="Never built" blurb="1,500 miles of Austin street frontage have no sidewalk at all. This street is one of them." />
+            <Story href="#falls" id="falls" title="Paid in falls" blurb="One in four adults over 65 falls each year. Most outdoor falls start on the ground itself." />
+            <Story
+              href="#broken"
+              id="failing"
+              lead
+              title="Failing the City's own test"
+              blurb="The City scored these blocks itself: red is functionally deficient. Citywide, only 32% of existing sidewalk passes, and no list names the panels in the other 68%."
             />
           </div>
         </div>
       </section>
 
-      {/* ---- The story: the 3D walk fills the screen behind the narrative
-              panel. On desktop the canvas is a fixed full-viewport layer (so
-              the finale can fade it into the map); on mobile it lives in the
-              sticky strip. ---- */}
-      {(desktop || mobileStage === "prologue") && (
-        <div
-          ref={desktop ? canvasLayerRef : undefined}
-          className="pointer-events-none fixed inset-x-0 top-[var(--topbar-h)] bottom-0 z-[5]"
-          aria-hidden
-        >
-          <WalkExperience
-            walk={walkProgress}
-            finaleScroll={finaleScroll}
-            layout="fixed"
-            prologue={prologueScroll}
-            prologueMode={scrub ? "scrub" : "auto"}
-          />
+      <section className="wrap feature" aria-labelledby="intro-title">
+        <div className="feature-media">
+          <Still id="conditions" captioned />
         </div>
-      )}
-      <div ref={storyRef} className="relative lg:flex">
-        <div className="sticky top-[var(--topbar-h)] z-20 h-[34dvh] min-w-0 border-b border-line bg-field-2 lg:static lg:z-auto lg:h-auto lg:flex-1 lg:border-b-0 lg:bg-transparent">
-          {!desktop && mobileStage === "story" && (
-            <div className="h-full">
-              <WalkExperience walk={walkProgress} finaleScroll={finaleScroll} layout="strip" />
+        <div className="feature-body">
+          <h2 id="intro-title">Austin knows its sidewalks by the mile. Nobody knows them by the panel.</h2>
+          <p>
+            This is the City's own map of one Northwest Austin neighborhood: in 2020 its assessors rated 2,580 of the 5,923 sidewalk segments
+            here functionally deficient. The City can price the entire fix and still can't name the slab that breaks the next hip. SideQuest ATX
+            is a student-run map of the same streets, built one photographed panel at a time, and every report stays open until a second photo
+            proves the repair.
+          </p>
+          <div className="stats">
+            <Stat label="of this neighborhood's assessed segments rate functionally deficient" title="Derived from the City's sidewalk inventory clipped to the Anderson Mill / Westwood area: 2,580 deficient of 5,923 assessed (3,343 acceptable), 221 pending.">
+              <CountUp value={44} suffix="%" duration={1.2} />
+            </Stat>
+          </div>
+          <p className="sources">
+            Source: <a href="https://data.austintexas.gov/d/vchz-d9ng" rel="noopener" target="_blank">City of Austin Open Data, Sidewalks (assessment of 2020)</a>, clipped to
+            the Anderson Mill and Westwood area; derived share = 2,580 ÷ 5,923.
+          </p>
+          <Link className="more" to="/how" viewTransition>
+            How a sidewalk gets fixed here
+          </Link>
+        </div>
+      </section>
+
+      <section className="band" aria-labelledby="math-title">
+        <div className="wrap">
+          <h2 id="math-title" className="statement">
+            The City priced the fix. Then it did the math on the money.
+          </h2>
+          <p className="statement-copy">
+            Building the planned network once costs about $903 million. Maintaining the 2,800 miles that already exist costs about $30 million a
+            year. At today's funding, the plan's own projection finishes the network in more than 90 years. A child born in Austin today will be
+            past retirement age when it's done.
+          </p>
+          <div className="stats">
+            <Stat label="years to finish the network at today's funding">
+              <CountUp value={90} suffix="+" duration={1.4} />
+            </Stat>
+            <Stat label="to build the planned network, once">$903M</Stat>
+            <Stat label="of America's fall-injury bill covers that entire build-out" title="Derived: $80B / 365 ≈ $219M per day; $903M / $219M ≈ 4.1 days.">
+              4 days
+            </Stat>
+          </div>
+          <p className="sources">
+            Sources: <a href={PLAN_URL} rel="noopener" target="_blank">City of Austin, Sidewalks, Crossings &amp; Shared Streets Plan (2023)</a> ·{" "}
+            <a href={NCOA_URL} rel="noopener" target="_blank">$80B a year in older-adult fall care, NCOA / Injury Prevention (2024)</a>. The
+            four-day figure is derived: $80B ÷ 365 ≈ $219M per day; $903M ÷ $219M ≈ 4.1 days.
+          </p>
+        </div>
+      </section>
+
+      <Feature id="missing" media="missing" title="Austin doesn't have a sidewalk network. It has 2,800 miles of fragments.">
+        <p>
+          Of 4,800 miles of street frontage, 2,800 have a sidewalk. The other 1,500 have nothing: about the drive from Austin to Washington, DC.
+          Only about half of Austin properties can reach a school on a sidewalk, a third a transit stop, a fifth a grocery store.
+        </p>
+        <div className="stats">
+          <Stat label="miles of street frontage with no sidewalk">
+            <CountUp value={1500} suffix=" mi" duration={1.6} />
+          </Stat>
+          <Stat label="of properties can reach a grocery store on a sidewalk">
+            <CountUp value={20} suffix="%" duration={1.2} />
+          </Stat>
+          <Stat label="can reach a transit stop">
+            <CountUp value={35} suffix="%" duration={1.2} />
+          </Stat>
+        </div>
+        <p className="sources">
+          Source: <a href={PLAN_URL} rel="noopener" target="_blank">City of Austin, Sidewalks, Crossings &amp; Shared Streets Plan (2023)</a>
+        </p>
+        <Link className="more" to="/map" viewTransition>
+          Open the live map
+        </Link>
+      </Feature>
+
+      <Feature id="broken" media="broken" reverse title="Most of what was built is failing the City's own test.">
+        <p>
+          32% of the existing network rates functionally acceptable. That is an average, and averages don't send a crew anywhere: no list names
+          the panels that make up the other 68%. A lifted panel is a half inch of concrete the City can price by the mile and cannot find by the
+          address.
+        </p>
+        <div className="stats">
+          <Stat label="of existing sidewalk rates functionally acceptable">
+            <CountUp value={32} suffix="%" duration={1.2} />
+          </Stat>
+          <Stat label="of it has no panel-level record at all">
+            <CountUp value={68} suffix="%" duration={1.2} />
+          </Stat>
+        </div>
+        <p className="sources">
+          Source: <a href={PLAN_URL} rel="noopener" target="_blank">City of Austin, Sidewalks, Crossings &amp; Shared Streets Plan (2023)</a>
+        </p>
+        <Link className="more" to="/app" viewTransition>
+          Photograph the one on your street
+        </Link>
+      </Feature>
+
+      <Feature id="falls" media="falls" title="The years are not free. They are paid in falls.">
+        <p>
+          Streets are engineered so a car never feels a half inch. Bodies got no such engineering: the same lip a tire ignores stops a bike wheel
+          and catches a toe. One in four adults 65 and older falls each year, and 73% of outdoor falls are set off by the environment itself,
+          "on sidewalks, curbs, and streets."
+        </p>
+        <div className="stats">
+          <Stat label="Americans over 65 killed by falls in 2023">
+            <CountUp value={41000} suffix="+" duration={1.6} />
+          </Stat>
+          <Stat label="Americans of every age killed in traffic that year">
+            <CountUp value={40901} duration={1.6} />
+          </Stat>
+        </div>
+        <p className="sources">
+          Sources: <a href={CDC_URL} rel="noopener" target="_blank">CDC, Older Adult Falls</a> ·{" "}
+          <a href={NCHS_URL} rel="noopener" target="_blank">CDC/NCHS Data Brief 532 (2023)</a> ·{" "}
+          <a href={NHTSA_URL} rel="noopener" target="_blank">NHTSA (2023)</a> ·{" "}
+          <a href={AJPH_URL} rel="noopener" target="_blank">Li et al., American Journal of Public Health (2006)</a> ·{" "}
+          <a href={SBC_URL} rel="noopener" target="_blank">Utriainen et al., Transport Reviews (2022)</a>: 60 to 95% of cyclists treated in
+          emergency rooms crashed with no car involved, and surface hazards are a leading factor.
+        </p>
+      </Feature>
+
+      <Feature id="precedent" media="precedent" reverse title="Cities that don't count their sidewalks eventually get counted by a court.">
+        <p>
+          Los Angeles agreed to spend $1.4 billion over 30 years on sidewalk repair after residents with mobility disabilities sued under the
+          Americans with Disabilities Act. It is the largest disability-access settlement in US history, and it began with people documenting
+          panels the city had never listed.
+        </p>
+        <div className="stats">
+          <Stat label="Los Angeles sidewalk settlement, Willits v. City of Los Angeles">
+            <CountUp value={1.4} prefix="$" suffix="B" decimals={1} duration={1.4} />
+          </Stat>
+          <Stat label="years of court-supervised repair">
+            <CountUp value={30} duration={1.2} />
+          </Stat>
+        </div>
+        <p className="sources">
+          Source: <a href={WILLITS_URL} rel="noopener" target="_blank">Willits v. City of Los Angeles (2015)</a>
+        </p>
+      </Feature>
+
+      <section className="band band--deep" aria-labelledby="count-title">
+        <div className="wrap live">
+          <div>
+            <h2 id="count-title" className="statement">
+              The count starts at zero.
+            </h2>
+            <p className="statement-copy">
+              Every number above is an estimate. Not one points to a panel. No agency can name the slab that breaks the next hip, so no crew gets
+              sent to it. That missing dataset doesn't take a bond to build. It takes photographs, and our numbers start at zero on the map, where
+              we never round up.
+            </p>
+            <div className="live-count" aria-live="polite">
+              <Stat label="on file">
+                <span className="pulse" aria-hidden />
+                {fmtInt(live.total)}
+              </Stat>
+              <Stat label="open">{fmtInt(live.open)}</Stat>
+              <Stat label="verified fixed">{fmtInt(live.fixed)}</Stat>
             </div>
-          )}
+            <div className="live-actions">
+              <Link to="/map" className="btn btn--dark" viewTransition>
+                Open the live map
+              </Link>
+              <Link to="/data" className="btn btn--ghost-dark" viewTransition>
+                Open data
+              </Link>
+            </div>
+          </div>
+          <Link to="/map" className="still live-map" aria-label="Open the live map" viewTransition>
+            {mapUrl ? <img src={mapUrl} alt="" loading="lazy" decoding="async" /> : <Still id="count" />}
+          </Link>
         </div>
-        <div className="relative z-10 border-line bg-surface px-5 sm:px-8 lg:w-[38%] lg:shrink-0 lg:border-l lg:px-10">
-          <Chapter id="missing">
-            <Claim>Austin doesn't have a sidewalk network. It has 2,800 miles of fragments.</Claim>
-            <Rise delay={0.1}>
-              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-extrabold tracking-tight text-olive-800 tabular-nums">
-                <CountUp value={1500} suffix=" mi" duration={1.8} />
-              </p>
-              <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
-                of Austin street frontage with no sidewalk at all. About the drive from Austin to Washington, DC.
-              </p>
-            </Rise>
-            <Rise delay={0.2} className="mt-8 max-w-xl">
-              <div className="flex items-baseline justify-between font-sans text-[13px]">
-                <span className="text-ink-soft">Street frontage with a sidewalk</span>
-                <span className="font-semibold text-ink tabular-nums">2,800 of 4,800 mi</span>
-              </div>
-              <div className="mt-2">
-                <Bar pct={58} />
-              </div>
-            </Rise>
-            <Source href={PLAN_URL}>City of Austin, Sidewalks, Crossings &amp; Shared Streets Plan (2023)</Source>
-          </Chapter>
+      </section>
 
-          <Chapter id="broken">
-            <Claim>Most of what was built is failing the City's own test.</Claim>
-            <Rise delay={0.1}>
-              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-extrabold tracking-tight text-olive-800 tabular-nums">
-                <CountUp value={32} suffix="%" duration={1.5} />
-              </p>
-              <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
-                of the existing network rates functionally acceptable. And that's an average: no list names the panels
-                that make up the other 68%.
-              </p>
-            </Rise>
-            <Rise delay={0.2} className="mt-8 max-w-xl">
-              <p className="font-sans text-[12px] font-semibold tracking-[0.1em] text-ink-mute uppercase">
-                Austin properties that can reach, on a sidewalk
-              </p>
-              <div className="mt-3 space-y-3 font-sans text-[13px]">
-                {(
-                  [
-                    ["A school", 51],
-                    ["A transit stop", 35],
-                    ["A grocery store", 20],
-                  ] as const
-                ).map(([label, pct]) => (
-                  <div key={label}>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-ink-soft">{label}</span>
-                      <span className="font-semibold text-ink tabular-nums">{pct}%</span>
-                    </div>
-                    <div className="mt-1.5">
-                      <Bar pct={pct} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Rise>
-            <Source href={PLAN_URL}>City of Austin, Sidewalks, Crossings &amp; Shared Streets Plan (2023)</Source>
-          </Chapter>
-
-          <Chapter id="math">
-            <Claim>The City priced the fix. Then it did the math on the money.</Claim>
-            <Rise delay={0.1}>
-              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-extrabold tracking-tight text-olive-800 tabular-nums">
-                <CountUp value={90} suffix="+ years" duration={1.5} />
-              </p>
-              <p
-                className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft"
-                title="Derived from the plan's own 90+ year projection: born 2026, finished after 2116."
-              >
-                to finish the network at today's funding, by the plan's own projection. A child born in Austin today
-                will be past retirement age when it's done.
-              </p>
-            </Rise>
-            <Rise delay={0.2} className="mt-8 max-w-xl space-y-2 font-sans text-[13px]">
-              <div className="flex items-baseline justify-between gap-4">
-                <span className="text-ink-soft">Building the planned network, once</span>
-                <span className="font-semibold text-ink tabular-nums">≈ $903M</span>
-              </div>
-              <div className="flex items-baseline justify-between gap-4">
-                <span className="text-ink-soft">Just maintaining the existing 2,800 miles</span>
-                <span className="font-semibold text-ink tabular-nums">≈ $30M every year</span>
-              </div>
-              <div
-                className="flex items-baseline justify-between gap-4"
-                title="Derived: $80B / 365 ≈ $219M per day; $903M / $219M ≈ 4.1 days."
-              >
-                <span className="text-ink-soft">What the US spends on fall injuries, every 4 days</span>
-                <span className="font-semibold text-ink tabular-nums">≈ $903M</span>
-              </div>
-            </Rise>
-            <Rise delay={0.25} className="mt-4 max-w-xl">
-              <p className="font-sans text-[0.95rem] leading-relaxed text-ink">
-                Read that last row again: America's fall-injury bill covers Austin's entire sidewalk build-out{" "}
-                <b>every four days</b>.
-              </p>
-            </Rise>
-            <Source href={PLAN_URL}>City of Austin, Sidewalks, Crossings &amp; Shared Streets Plan (2023)</Source>
-            <Source href={NCOA_URL}>$80B/yr in older-adult fall care: NCOA / Injury Prevention (2024)</Source>
-          </Chapter>
-
-          <Chapter id="falls">
-            <Claim>The years are not free. They are paid in falls.</Claim>
-            <Rise delay={0.1}>
-              <p className="mt-5 max-w-xl font-sans text-[0.95rem] leading-relaxed text-ink-soft">
-                Streets are engineered so a car never feels a half inch. Bodies got no such engineering: the same lip a
-                tire ignores stops a bike wheel and catches a toe.
-              </p>
-            </Rise>
-            <Rise delay={0.15}>
-              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-extrabold tracking-tight text-olive-800 tabular-nums">
-                1 in 4
-              </p>
-              <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
-                adults 65 and older falls each year.
-              </p>
-            </Rise>
-            <Rise delay={0.2} className="mt-6 max-w-xl">
-              <FallTicker />
-            </Rise>
-            <Rise delay={0.25} className="mt-4 max-w-xl">
-              <p className="font-sans text-[0.95rem] leading-relaxed text-ink">
-                In 2023, falls killed <b className="tabular-nums">41,000+</b> Americans over 65: more than car crashes
-                killed Americans <i>of every age</i> (<span className="tabular-nums">40,901</span>).
-              </p>
-            </Rise>
-            <Rise delay={0.3} className="mt-4 max-w-xl">
-              <div className="rounded-[var(--r-md)] bg-olive-600/8 px-4 py-3.5">
-                <p className="font-sans text-[0.95rem] leading-relaxed text-ink">
-                  <b className="tabular-nums">73%</b> of outdoor falls are set off by the environment itself: "on
-                  sidewalks, curbs, and streets."
-                </p>
-              </div>
-              <p className="mt-3 font-sans text-[13px] leading-relaxed text-ink-soft">
-                Cyclists too: in study after study, 60 to 95% of riders treated in emergency rooms crashed with no car
-                involved, and surface hazards are a leading factor.
-              </p>
-            </Rise>
-            <Source href={CDC_URL}>CDC, Older Adult Falls</Source>
-            <Source href={NCHS_URL}>Fall deaths: CDC/NCHS Data Brief 532 (2023)</Source>
-            <Source href={NHTSA_URL}>Traffic deaths: NHTSA (2023)</Source>
-            <Source href={AJPH_URL}>Li et al., American Journal of Public Health (2006)</Source>
-            <Source href={SBC_URL}>Utriainen et al., Transport Reviews (2022)</Source>
-          </Chapter>
-
-          <Chapter id="precedent">
-            <Claim>Cities that don't count their sidewalks eventually get counted by a court.</Claim>
-            <Rise delay={0.1}>
-              <p className="mt-6 font-sans text-[clamp(2.7rem,2.2vw+1.6rem,4rem)] leading-[1.04] font-extrabold tracking-tight text-olive-800 tabular-nums">
-                <CountUp value={1.4} prefix="$" suffix="B" decimals={1} duration={1.5} />
-              </p>
-              <p className="mt-2.5 max-w-xl font-sans text-[0.95rem] text-ink-soft">
-                is what Los Angeles agreed to spend on sidewalk repair over 30 years after residents with mobility
-                disabilities sued under the ADA. The largest disability-access settlement in US history.
-              </p>
-            </Rise>
-            <Source href={WILLITS_URL}>Willits v. City of Los Angeles (2015)</Source>
-          </Chapter>
-
-          <Chapter id="count">
-            <Claim>Every number above is an estimate. Not one points to a panel.</Claim>
-            <Rise delay={0.1}>
-              <p className="mt-5 max-w-xl font-sans text-[0.95rem] leading-relaxed text-ink-soft">
-                No agency can name the slab that breaks the next hip, so no crew gets sent to it. That is the missing
-                dataset, and it doesn't take a bond to build. It takes photographs.
-              </p>
-              <p className="mt-4 max-w-xl font-sans text-[0.95rem] leading-relaxed text-ink">
-                Fixing this takes <b>policy</b> and <b>action</b>. The City's plan above is the policy. The map below is
-                the action.
-              </p>
-            </Rise>
-            <Rise delay={0.2} className="mt-7 max-w-xl space-y-2.5 font-sans text-[14px]">
-              {(
-                [
-                  ["Photograph it", "one clear frame; GPS locks at the shutter."],
-                  ["We route it", "structural defects to Austin 311 with a tracked ticket, vegetation to the landowner."],
-                  ["Proof closes it", "nothing is marked fixed without a second photo and a named sign-off."],
-                ] as const
-              ).map(([t, b]) => (
-                <p key={t} className="leading-relaxed">
-                  <b className="text-ink">{t}:</b> <span className="text-ink-soft">{b}</span>
-                </p>
-              ))}
-            </Rise>
-            <Rise delay={0.3} className="mt-7 max-w-xl">
-              <p className="rounded-[var(--r-md)] bg-field-2 px-3.5 py-2.5 font-sans text-[12px] leading-snug text-ink-soft">
-                Everything above is the City's, the CDC's, the journals', and a federal court's. Our numbers start at
-                zero on the map below, and we never round up.
-              </p>
-              <p className="mt-5 font-serif text-[1.05rem] leading-relaxed text-ink-soft italic">
-                Our 80-year-old grandmother broke her finger on a root-lifted panel nobody had reported.
-              </p>
-              <div className="btn-row mt-6">
-                <Link to="/app" className="btn btn--primary" viewTransition>
-                  Get the app
-                </Link>
-                <Link to="/how" className="btn" viewTransition>
-                  How it works
-                </Link>
-              </div>
-            </Rise>
-          </Chapter>
+      <section className="section" aria-labelledby="how-title">
+        <div className="wrap">
+          <h2 id="how-title" className="h2">
+            How a sidewalk gets fixed here
+          </h2>
+          <div className="steps" style={{ marginTop: "2.5rem" }}>
+            <Step n={1} title="Photograph it">
+              One clear frame from the app. The GPS fix is taken at the shutter and written into the picture itself. Public right-of-way only;
+              no faces, plates, or house numbers, ever.
+            </Step>
+            <Step n={2} title="We route it">
+              Structural defects go to Austin 311 with a tracked ticket number. Vegetation gets a door-hanger for the landowner, who usually clears
+              it in days.
+            </Step>
+            <Step n={3} title="Proof closes it">
+              Nothing is marked fixed without a second photo and a named sign-off. Before and after go on the map, and the report stays public.
+            </Step>
+          </div>
+          <div className="btn-row" style={{ marginTop: "2.5rem" }}>
+            <Link to="/how" className="btn btn--primary" viewTransition>
+              The whole process
+            </Link>
+            <Link to="/data" className="btn" viewTransition>
+              What we publish
+            </Link>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* ---- Finale: the scroll dives into the map ---- */}
-      <MapFinale armed={mapArmed} live={live} mapUrl={mapUrl} sectionRef={finaleRef} progress={finaleScroll} />
+      <section className="band" aria-labelledby="promise-title">
+        <div className="wrap">
+          <h2 id="promise-title" className="quote">
+            No one's grandmother should be injured by a sidewalk a photograph could have fixed.
+          </h2>
+          <p className="quote-by">
+            Ours broke her finger on a root-lifted panel nobody had reported. The panel is on the map now. So is the fix.
+          </p>
+          <div className="live-actions">
+            <Link to="/app" className="btn btn--dark" viewTransition>
+              Get the app
+            </Link>
+          </div>
+        </div>
+      </section>
     </>
   );
 }
 
 /* ================= building blocks ================= */
 
-function Chapter({ id, children }: { id: string; children: ReactNode }) {
+function Hero() {
+  const reduced = useReducedMotion();
+  const video = useRef<HTMLVideoElement>(null);
+  const [ready, setReady] = useState(false);
+  const [posterMissing, setPosterMissing] = useState(false);
+  const [playing, setPlaying] = useState(true);
+
+  useEffect(() => {
+    const v = video.current;
+    if (!v) return;
+    if (reduced) {
+      v.pause();
+      setPlaying(false);
+    }
+  }, [reduced]);
+
+  // Media events can fire before React attaches its listeners (a cached
+  // file is "canplay" almost immediately), so also read the state directly.
+  useEffect(() => {
+    const v = video.current;
+    if (!v || ready) return;
+    const check = () => {
+      if (v.readyState >= 3) setReady(true);
+    };
+    check();
+    const id = window.setInterval(check, 250);
+    const stop = window.setTimeout(() => window.clearInterval(id), 30000);
+    return () => {
+      window.clearInterval(id);
+      window.clearTimeout(stop);
+    };
+  }, [ready]);
+
+  const toggle = () => {
+    const v = video.current;
+    if (!v) return;
+    if (v.paused) {
+      void v.play();
+      setPlaying(true);
+    } else {
+      v.pause();
+      setPlaying(false);
+    }
+  };
+
   return (
-    <section id={id} className="grid min-h-[88vh] content-center py-16">
-      <div className="max-w-2xl">{children}</div>
+    <section className="hero" aria-labelledby="hero-title">
+      <div className="hero-media" aria-hidden>
+        <img
+          src={MEDIA.hero.poster}
+          alt=""
+          className={posterMissing ? "is-missing" : undefined}
+          fetchPriority="high"
+          decoding="async"
+          onError={() => setPosterMissing(true)}
+        />
+        <video
+          ref={video}
+          className={ready ? "is-ready" : undefined}
+          autoPlay={!reduced}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          poster={posterMissing ? undefined : MEDIA.hero.poster}
+          onCanPlay={() => setReady(true)}
+          onPlaying={() => setReady(true)}
+        >
+          <source src={MEDIA.hero.webm} type="video/webm" />
+          <source src={MEDIA.hero.mp4} type="video/mp4" />
+        </video>
+      </div>
+      <div className="hero-scrim" aria-hidden />
+      <div className="wrap hero-inner">
+        <motion.h1
+          id="hero-title"
+          className="hero-title"
+          initial={reduced ? false : { opacity: 0, y: 28 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+        >
+          Nobody knows Austin's sidewalks by the panel.
+        </motion.h1>
+        <motion.p
+          className="hero-sub"
+          initial={reduced ? false : { opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
+        >
+          SideQuest ATX photographs every broken, blocked, or missing sidewalk panel in Austin, puts it on a living public map, and tracks it until
+          a second photo proves the fix.
+        </motion.p>
+        <motion.div
+          className="hero-actions"
+          initial={reduced ? false : { opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
+        >
+          <Link to="/map" className="btn btn--primary btn--lg" viewTransition>
+            See the live map
+          </Link>
+          <Link to="/app" className="btn btn--dark btn--lg" viewTransition>
+            Get the app
+          </Link>
+        </motion.div>
+      </div>
+      {ready && (
+        <button type="button" className="hero-toggle" onClick={toggle} aria-label={playing ? "Pause background video" : "Play background video"}>
+          {playing ? (
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <rect x="6" y="5" width="4" height="14" rx="1" />
+              <rect x="14" y="5" width="4" height="14" rx="1" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <path d="M8 5.5v13l11-6.5z" />
+            </svg>
+          )}
+        </button>
+      )}
     </section>
   );
 }
 
-function Claim({ children }: { children: ReactNode }) {
+function Story({ href, id, title, blurb, lead = false }: { href: string; id: StillId; title: string; blurb: string; lead?: boolean }) {
   return (
-    <Rise>
-      <h2 className="max-w-2xl font-serif text-[clamp(1.55rem,1vw+1rem,1.95rem)] leading-[1.14] font-bold tracking-[-0.015em] text-balance">
+    <a className={lead ? "story story--lead" : "story"} href={href}>
+      <Still id={id} priority={lead} />
+      <div className="story-cap">
+        <h3>{title}</h3>
+        <p>{blurb}</p>
+      </div>
+    </a>
+  );
+}
+
+function Feature({ id, media, title, reverse = false, children }: { id: string; media: StillId; title: string; reverse?: boolean; children: ReactNode }) {
+  return (
+    <section id={id} className={reverse ? "wrap feature feature--rev" : "wrap feature"} aria-labelledby={`${id}-title`}>
+      <div className="feature-media">
+        <Still id={media} />
+      </div>
+      <div className="feature-body">
+        <h2 id={`${id}-title`}>{title}</h2>
         {children}
-      </h2>
-    </Rise>
+      </div>
+    </section>
   );
 }
 
-function Rise({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
-  const reduced = useReducedMotion();
+function Stat({ label, title, children }: { label: string; title?: string; children: ReactNode }) {
   return (
-    <motion.div
-      className={className}
-      initial={reduced ? false : { opacity: 0, y: 26 }}
-      whileInView={reduced ? undefined : { opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.3, margin: "0px 0px -8% 0px" }}
-      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-function Bar({ pct }: { pct: number }) {
-  const reduced = useReducedMotion();
-  return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-olive-600/12">
-      <motion.div
-        className="h-full rounded-full bg-olive-600"
-        initial={reduced ? { width: `${pct}%` } : { width: "0%" }}
-        whileInView={{ width: `${pct}%` }}
-        viewport={{ once: true, amount: 0.9 }}
-        transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-      />
+    <div className="stat" title={title}>
+      <b>{children}</b>
+      <span>{label}</span>
     </div>
   );
 }
 
-function Source({ href, children }: { href: string; children: ReactNode }) {
+function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
-    <p className="mt-1.5 font-sans text-[11.5px] text-ink-mute first-of-type:mt-6">
-      Source:{" "}
-      <a href={href} rel="noopener" target="_blank" className="underline decoration-line underline-offset-2 hover:text-ink-soft">
-        {children}
-      </a>
-    </p>
-  );
-}
-
-/** Right-edge dot rail, the narrated-report signature. Desktop only. */
-function ChapterRail({ active, reduced }: { active: string | null; reduced: boolean | null }) {
-  const visible = active !== null && active !== "prologue" && active !== "finale";
-  return (
-    <nav
-      aria-label="Story chapters"
-      className={`fixed top-1/2 right-5 z-10 hidden -translate-y-1/2 flex-col items-end gap-3 transition-opacity duration-500 xl:flex ${
-        visible ? "opacity-100" : "pointer-events-none opacity-0"
-      }`}
-    >
-      {CHAPTERS.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          onClick={() => document.getElementById(c.id)?.scrollIntoView({ behavior: reduced ? "auto" : "smooth" })}
-          className="group flex items-center gap-2.5"
-          aria-label={c.label}
-          aria-current={active === c.id ? "true" : undefined}
-        >
-          <span className="font-sans text-[11px] text-ink-mute opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-            {c.label}
-          </span>
-          <span
-            className={`rounded-full transition-all duration-300 ${
-              active === c.id ? "h-5 w-1.5 bg-olive-700" : "h-1.5 w-1.5 bg-olive-600/35 group-hover:bg-olive-600/70"
-            }`}
-          />
-        </button>
-      ))}
-    </nav>
-  );
-}
-
-function MapFinale({
-  armed,
-  live,
-  mapUrl,
-  sectionRef,
-  progress,
-}: {
-  armed: boolean;
-  live: { total: number; open: number; fixed: number };
-  mapUrl: string | null;
-  sectionRef: RefObject<HTMLElement | null>;
-  progress: MotionValue<number>;
-}) {
-  const [engaged, setEngaged] = useState(false);
-  useMotionValueEvent(progress, "change", (v) => setEngaged(v > 0.72));
-  const [failed, setFailed] = useState(false);
-  const { token } = useMapboxToken();
-  const liveMap = armed && Boolean(token) && !failed;
-
-  return (
-    <section ref={sectionRef} id="finale" className="relative h-[300vh] bg-field">
-      <div className="sticky top-0 h-dvh overflow-hidden bg-field-2">
-        {liveMap ? (
-          <DiveMap progress={progress} onFail={() => setFailed(true)} />
-        ) : mapUrl ? (
-          <img src={mapUrl} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover" />
-        ) : (
-          <div className="absolute inset-0 grid place-items-center font-sans text-[13px] text-ink-mute">
-            The map is loading.
-          </div>
-        )}
-
-        <span className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-olive-900/55 to-transparent" aria-hidden />
-        <Link
-          to="/map"
-          viewTransition
-          aria-label="Open the live map"
-          className={engaged ? "absolute inset-0" : "hidden"}
-        />
-
-        <motion.div
-          className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-9"
-          initial={false}
-          animate={engaged ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
-          transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <div className="pointer-events-auto max-w-md rounded-[var(--r-lg)] bg-olive-900/92 p-5 text-ink-on-dark shadow-xl sm:p-6">
-            <p className="flex items-center gap-2 font-sans text-[11px] font-semibold tracking-[0.14em] text-ink-on-dark-soft uppercase">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-olive-400 opacity-60 motion-reduce:hidden" />
-                <span className="relative inline-flex size-2 rounded-full bg-olive-300" />
-              </span>
-              Our count · live
-            </p>
-            <p className="mt-2.5 font-serif text-[1.45rem] leading-tight font-semibold tracking-[-0.01em]">The count starts at zero.</p>
-            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 font-sans text-[13px] text-ink-on-dark-soft">
-              <span>
-                <b className="text-ink-on-dark tabular-nums">{fmtInt(live.total)}</b> on file
-              </span>
-              <span>
-                <b className="text-ink-on-dark tabular-nums">{fmtInt(live.open)}</b> open
-              </span>
-              <span>
-                <b className="text-ink-on-dark tabular-nums">{fmtInt(live.fixed)}</b> verified fixed
-              </span>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2.5">
-              <Link to="/map" className="btn btn--dark btn--sm" viewTransition>
-                Open the live map →
-              </Link>
-              <Link to="/app" className="btn btn--ghost-dark btn--sm" viewTransition>
-                Get the app
-              </Link>
-            </div>
-          </div>
-        </motion.div>
+    <div className="step">
+      <div className="step-n" aria-hidden>
+        {n}
       </div>
-    </section>
+      <h3>{title}</h3>
+      <p>{children}</p>
+    </div>
   );
 }

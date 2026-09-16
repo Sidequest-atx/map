@@ -64,7 +64,13 @@ export function ReportDetailScreen({ route, navigation }: ScreenProps<"ReportDet
     if (!r) return;
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert("Camera needed", "An after-photo is required to resolve a report.");
+      // Once iOS stops asking, only the Settings app can turn the camera back on.
+      if (perm.canAskAgain) Alert.alert("Camera needed", "An after-photo is required to resolve a report.");
+      else
+        Alert.alert("Camera access is off", "An after-photo is required to resolve a report. Turn on Camera for SideQuest in Settings.", [
+          { text: "Cancel", style: "cancel" },
+          { text: "Open Settings", onPress: () => void Linking.openSettings() },
+        ]);
       return;
     }
     const res = await ImagePicker.launchCameraAsync({ quality: 0.9, exif: false, cameraType: ImagePicker.CameraType.back });

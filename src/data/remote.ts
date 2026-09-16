@@ -1,7 +1,8 @@
 import { toast } from "../components/Toast";
+import { friendlySaveError } from "../lib/authErrors";
 import { photoUrl, supabase } from "../lib/supabase";
-import type { DriveSession, HazardReport, HazardType, ReportStatus, Severity } from "../types";
-import type { ReportStore } from "./store";
+import { STATUS_LABELS, type DriveSession, type HazardReport, type HazardType, type ReportStatus, type Severity } from "../types";
+import type { LoadState, ReportStore } from "./store";
 
 /**
  * ReportStore backed by the shared Supabase project (tables sq_reports /
@@ -9,8 +10,9 @@ import type { ReportStore } from "./store";
  * writes through the signed-in session and RLS has the final say.
  *
  * The interface is synchronous, so this store keeps an in-memory cache:
- * mutations apply optimistically, push async, and refetch on failure so the
- * UI never shows a state the server refused.
+ * mutations apply optimistically and push async. A refused or failed write
+ * is rolled back at once (it does not wait for a refetch, which also fails
+ * offline), and "saved" is only announced after the server confirms.
  */
 
 interface Row {
@@ -103,6 +105,8 @@ async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
   return res.blob();
 }
 
+const NOT_SAVED = "the report no longer exists, or you lack the role";
+
 export class SupabaseStore implements ReportStore {
   private reports: HazardReport[] = [];
   private driveSessions: DriveSession[] = [];
@@ -110,13 +114,17 @@ export class SupabaseStore implements ReportStore {
   private snapshot: HazardReport[] | null = null;
   private driveSnapshot: DriveSession[] | null = null;
   private started = false;
-  /** Resolves when the first fetch lands; MapExplorer waits on nothing, it just repaints. */
-  loaded = false;
+  private state: LoadState = { loaded: false, error: null };
 
   private emit() {
     this.snapshot = null;
     this.driveSnapshot = null;
     this.listeners.forEach((l) => l());
+  }
+
+  private setState(next: LoadState) {
+    if (next.loaded === this.state.loaded && next.error === this.state.error) return;
+    this.state = next;
   }
 
   private start() {
@@ -137,29 +145,37 @@ export class SupabaseStore implements ReportStore {
 
   async refresh(): Promise<void> {
     const sb = supabase();
-    const [reports, drives] = await Promise.all([
-      sb.from("sq_reports").select("*").order("created_at", { ascending: false }).limit(5000),
-      sb.from("sq_drives").select("*").order("started_at", { ascending: false }).limit(500),
-    ]);
-    if (reports.error) {
-      console.warn("sq_reports fetch failed:", reports.error.message);
-      return;
+    try {
+      const [reports, drives] = await Promise.all([
+        sb.from("sq_reports").select("*").order("created_at", { ascending: false }).limit(5000),
+        sb.from("sq_drives").select("*").order("started_at", { ascending: false }).limit(500),
+      ]);
+      if (reports.error) {
+        console.warn("sq_reports fetch failed:", reports.error.message);
+        this.setState({ loaded: this.state.loaded, error: reports.error.message });
+        this.emit();
+        return;
+      }
+      this.reports = (reports.data as Row[]).map(fromRow);
+      if (!drives.error && drives.data) {
+        this.driveSessions = drives.data.map((d) => ({
+          id: d.id as string,
+          captain: (d.captain as string) || "",
+          startedAt: d.started_at as string,
+          endedAt: (d.ended_at as string) ?? undefined,
+          trail: (d.trail as [number, number][]) ?? [],
+          frames: (d.frames as number) ?? 0,
+          reports: (d.reports as number) ?? 0,
+          miles: (d.miles as number) ?? 0,
+        }));
+      }
+      this.setState({ loaded: true, error: null });
+      this.emit();
+    } catch (e) {
+      console.warn("sq_reports fetch failed:", e);
+      this.setState({ loaded: this.state.loaded, error: e instanceof Error ? e.message : String(e) });
+      this.emit();
     }
-    this.reports = (reports.data as Row[]).map(fromRow);
-    if (!drives.error && drives.data) {
-      this.driveSessions = drives.data.map((d) => ({
-        id: d.id as string,
-        captain: (d.captain as string) || "",
-        startedAt: d.started_at as string,
-        endedAt: (d.ended_at as string) ?? undefined,
-        trail: (d.trail as [number, number][]) ?? [],
-        frames: (d.frames as number) ?? 0,
-        reports: (d.reports as number) ?? 0,
-        miles: (d.miles as number) ?? 0,
-      }));
-    }
-    this.loaded = true;
-    this.emit();
   }
 
   list(): HazardReport[] {
@@ -180,6 +196,14 @@ export class SupabaseStore implements ReportStore {
     return this.driveSnapshot;
   }
 
+  loadState(): LoadState {
+    return this.state;
+  }
+
+  reload() {
+    void this.refresh();
+  }
+
   nextRef(): string {
     // The server assigns refs; the web surface no longer creates reports.
     return "SQ-????";
@@ -193,10 +217,26 @@ export class SupabaseStore implements ReportStore {
     throw new Error("Photos are captured in the iPhone app; the website is the map.");
   }
 
-  update(id: string, patch: Partial<HazardReport>) {
+  /** Put a report back the way it was before a write the server refused. */
+  private restore(prev: HazardReport) {
+    const i = this.reports.findIndex((x) => x.id === prev.id);
+    if (i < 0) return;
+    this.reports[i] = prev;
+    this.emit();
+  }
+
+  private failed(prev: HazardReport, e: unknown) {
+    console.warn("[SideQuest] write failed:", e);
+    this.restore(prev);
+    toast(friendlySaveError(e), "danger");
+    void this.refresh();
+  }
+
+  update(id: string, patch: Partial<HazardReport>, opts?: { successToast?: string }) {
     const i = this.reports.findIndex((x) => x.id === id);
     if (i < 0) return;
-    this.reports[i] = { ...this.reports[i], ...patch, updatedAt: new Date().toISOString() };
+    const prev = this.reports[i];
+    this.reports[i] = { ...prev, ...patch, updatedAt: new Date().toISOString() };
     this.emit();
     const row = patchToRow(patch);
     if (Object.keys(row).length === 0) return;
@@ -207,12 +247,13 @@ export class SupabaseStore implements ReportStore {
       .update(row)
       .eq("id", id)
       .select("id")
-      .then(({ data, error }) => {
-        if (error || !data?.length) {
-          toast(`Change was not saved: ${error?.message ?? "the report no longer exists, or you lack the role"}`, "danger");
-          void this.refresh();
-        }
-      });
+      .then(
+        ({ data, error }) => {
+          if (error || !data?.length) this.failed(prev, error ?? new Error(NOT_SAVED));
+          else if (opts?.successToast) toast(opts.successToast, "ok");
+        },
+        (e: unknown) => this.failed(prev, e),
+      );
   }
 
   setStatus(id: string, status: ReportStatus, meta: { ticket311?: string; afterPhoto?: string; by?: string; verified?: boolean } = {}) {
@@ -223,6 +264,7 @@ export class SupabaseStore implements ReportStore {
       return { ok: false as const, reason: "An after-photo is required to resolve a report." };
     }
     const now = new Date().toISOString();
+    const reopening = prev.status === "resolved" && status !== "resolved";
     const next: HazardReport = { ...prev, status, updatedAt: now };
     if (meta.ticket311) next.ticket311 = meta.ticket311;
     if (status === "resolved") {
@@ -230,17 +272,20 @@ export class SupabaseStore implements ReportStore {
       next.resolvedAt = now;
       next.resolvedBy = meta.by ?? prev.resolvedBy ?? "moderator";
       next.verified = meta.verified ?? prev.verified ?? false;
-    } else if (prev.resolvedAt) {
+    } else if (reopening || prev.resolvedAt) {
+      // Reopened: the old close-out no longer applies, so a new after-photo is needed.
       next.resolvedAt = undefined;
+      next.resolvedBy = undefined;
+      next.afterPhoto = undefined;
       next.verified = false;
     }
     this.reports[i] = next;
     this.emit();
-    void this.pushStatus(prev, next, meta);
+    void this.pushStatus(prev, next, meta, reopening);
     return { ok: true as const };
   }
 
-  private async pushStatus(prev: HazardReport, next: HazardReport, meta: { afterPhoto?: string }) {
+  private async pushStatus(prev: HazardReport, next: HazardReport, meta: { afterPhoto?: string }, reopening: boolean) {
     const sb = supabase();
     try {
       const row: Record<string, unknown> = {
@@ -250,6 +295,7 @@ export class SupabaseStore implements ReportStore {
         resolved_by: next.resolvedBy ?? null,
         verified: next.verified ?? false,
       };
+      if (reopening) row.after_photo_path = null;
       // A new after-photo arrives as a data URL from the Portal's file input;
       // it becomes an object under the signed-in moderator's folder.
       if (meta.afterPhoto?.startsWith("data:")) {
@@ -261,15 +307,15 @@ export class SupabaseStore implements ReportStore {
           contentType: "image/jpeg",
           upsert: true,
         });
-        if (up.error) throw new Error(up.error.message);
+        if (up.error) throw new Error(`upload: ${up.error.message}`);
         row.after_photo_path = path;
       }
       const { data, error } = await sb.from("sq_reports").update(row).eq("id", prev.id).select("id");
-      if (error) throw new Error(error.message);
-      if (!data?.length) throw new Error("the report no longer exists, or you lack the role");
+      if (error) throw error;
+      if (!data?.length) throw new Error(NOT_SAVED);
+      toast(`${prev.ref} → ${STATUS_LABELS[next.status]}`, "ok");
     } catch (e) {
-      toast(`Status change was not saved: ${e instanceof Error ? e.message : String(e)}`, "danger");
-      void this.refresh();
+      this.failed(prev, e);
     }
   }
 

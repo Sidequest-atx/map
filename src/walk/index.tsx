@@ -16,7 +16,7 @@ const TIME_ICON: Record<TimeChoice, string> = { auto: "◐", morning: "☀", day
 function Poster() {
   const [ok, setOk] = useState(true);
   if (!ok) return <div className="h-full w-full bg-field-2" aria-hidden />;
-  return <img src="/walk-poster.webp" alt="" aria-hidden className="h-full w-full object-cover" onError={() => setOk(false)} />;
+  return <img src="/walk-poster.webp" alt="" aria-hidden fetchPriority="high" className="h-full w-full object-cover" onError={() => setOk(false)} />;
 }
 
 function webglOk() {
@@ -36,6 +36,8 @@ function webglOk() {
   }
 }
 
+type IdleWindow = Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+
 export function WalkExperience({
   walk,
   finaleScroll,
@@ -54,6 +56,7 @@ export function WalkExperience({
   const gl = useMemo(webglOk, []);
   const [time, setTime] = useState<TimeChoice>("auto");
   const [poor, setPoor] = useState(false);
+  const [ready, setReady] = useState(false);
 
   // The finale's first half rises the camera to the top-down map framing.
   const rise = useTransform(finaleScroll, [0.06, 0.5], [0, 1]);
@@ -80,19 +83,41 @@ export function WalkExperience({
     el.style.pointerEvents = o < 0.05 ? "none" : "auto";
   });
 
-  // With the prologue the scene engages on mount (the flyover IS the
-  // opening frame); without it, not until the reader starts moving. The
-  // poster holds the frame until the scene's first paint either way.
-  const [engaged, setEngaged] = useState(!!prologue);
+  // Building the world is the heaviest work on the page. The poster (which
+  // looks like the opening frame) paints first; the scene starts once the
+  // browser is idle after load, or as soon as the reader scrolls, taps or
+  // types, so early taps on the header never wait behind the build. Without
+  // the prologue it waits for the reader to start moving, as before.
+  const [engaged, setEngaged] = useState(false);
   useEffect(() => {
     if (engaged) return;
-    const arm = () => {
-      if (scrollY > 120 || walk.get() > 0) setEngaged(true);
+    const go = () => setEngaged(true);
+    const onScroll = () => {
+      if (scrollY > 120 || walk.get() > 0) go();
     };
-    arm();
-    addEventListener("scroll", arm, { passive: true });
-    return () => removeEventListener("scroll", arm);
-  }, [engaged, walk]);
+    const w = window as IdleWindow;
+    let idleId: number | undefined;
+    let timer: number | undefined;
+    const schedule = () => {
+      if (w.requestIdleCallback) idleId = w.requestIdleCallback(go, { timeout: 2500 });
+      else timer = window.setTimeout(go, 1500);
+    };
+    const inputs = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+    if (prologue) {
+      if (document.readyState === "complete") schedule();
+      else addEventListener("load", schedule, { once: true });
+      for (const t of inputs) addEventListener(t, go, { once: true, passive: true });
+    }
+    onScroll();
+    addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      removeEventListener("scroll", onScroll);
+      removeEventListener("load", schedule);
+      for (const t of inputs) removeEventListener(t, go);
+      if (idleId !== undefined) w.cancelIdleCallback?.(idleId);
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [engaged, walk, prologue]);
 
   if (reduced || !gl || poor) {
     return <Poster />;
@@ -105,7 +130,9 @@ export function WalkExperience({
       </div>
       {engaged && (
         <Suspense fallback={null}>
-          <div className="absolute inset-0">
+          {/* The poster holds until every system is built and compiled, so the
+              world never visibly assembles itself piece by piece. */}
+          <div className={`absolute inset-0 transition-opacity duration-500 ${ready ? "opacity-100" : "opacity-0"}`} aria-hidden>
             <WalkScene
               progress={walk}
               finale={rise}
@@ -115,7 +142,9 @@ export function WalkExperience({
               reduced={false}
               prologue={prologue}
               prologueMode={prologueMode}
+              capture={typeof location !== "undefined" && location.search.includes("posterbuf")}
               onPoor={() => setPoor(true)}
+              onReady={() => setReady(true)}
             />
           </div>
         </Suspense>
@@ -125,13 +154,13 @@ export function WalkExperience({
         ref={chipRef}
         type="button"
         onClick={() => setTime((t) => TIME_CYCLE[(TIME_CYCLE.indexOf(t) + 1) % TIME_CYCLE.length])}
-        className="pointer-events-auto absolute bottom-3 left-4 flex items-center gap-1.5 rounded-full border border-line bg-surface/85 px-2.5 py-1 font-mono text-[10px] tracking-[0.14em] text-ink-soft uppercase shadow-sm backdrop-blur-sm hover:text-ink"
-        aria-label="Change time of day"
+        className="pointer-events-auto absolute bottom-3 left-4 flex min-h-6 items-center gap-1.5 rounded-full border border-line bg-surface/85 px-2.5 py-1 font-mono text-[10px] tracking-[0.14em] text-ink-soft uppercase shadow-sm backdrop-blur-sm hover:text-ink"
       >
+        <span className="sr-only">Time of day: </span>
         <span aria-hidden>{TIME_ICON[time]}</span>
         {time}
       </button>
-      <p className="pointer-events-none absolute bottom-3 right-4 hidden font-mono text-[10px] tracking-[0.16em] text-ink-mute uppercase lg:block">
+      <p className="pointer-events-none absolute bottom-3 right-4 hidden font-mono text-[10px] tracking-[0.16em] text-ink-mute uppercase lg:block" aria-hidden>
         One sidewalk · you are the ring
       </p>
     </div>

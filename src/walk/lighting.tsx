@@ -5,7 +5,7 @@
  * emissives: lit house windows, downtown facades, street lamps, signals,
  * headlights (read by the traffic system via walkState.night).
  */
-import { useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { worldLib } from "./world/materials";
@@ -40,6 +40,10 @@ type Rig = {
 const RIGS: Record<TimeName, Rig> = {
   /* Day skies lean warm beige so the canvas melts into the site's field
      instead of reading as a blue-gray videogame sky. */
+  /* Fog note: the ortho camera rides 420 units from its focus, so anything
+     nearer than ~460 fogs the SUBJECT itself. Fog starts past the focus
+     plane — the world in frame stays clean, only the far edges dissolve
+     into the page. */
   morning: {
     sunDir: [0.75, 0.5, 0.35],
     sunColor: "#ffe3b5",
@@ -48,9 +52,9 @@ const RIGS: Record<TimeName, Rig> = {
     hemiGround: "#8e876c",
     hemiI: 0.55,
     bg: "#e9e5d3",
-    fogNear: 260,
-    fogFar: 900,
-    env: 0.35,
+    fogNear: 470,
+    fogFar: 1250,
+    env: 0.45,
     night: 0,
     exposure: 1.0,
   },
@@ -62,9 +66,9 @@ const RIGS: Record<TimeName, Rig> = {
     hemiGround: "#97906f",
     hemiI: 0.6,
     bg: "#e8e4d3",
-    fogNear: 300,
-    fogFar: 1000,
-    env: 0.4,
+    fogNear: 480,
+    fogFar: 1350,
+    env: 0.5,
     night: 0,
     exposure: 1.0,
   },
@@ -76,9 +80,9 @@ const RIGS: Record<TimeName, Rig> = {
     hemiGround: "#8b7a5c",
     hemiI: 0.5,
     bg: "#efdcbc",
-    fogNear: 310,
-    fogFar: 980,
-    env: 0.32,
+    fogNear: 470,
+    fogFar: 1250,
+    env: 0.42,
     night: 0.08,
     exposure: 1.02,
   },
@@ -90,19 +94,29 @@ const RIGS: Record<TimeName, Rig> = {
     hemiGround: "#1a1c22",
     hemiI: 0.5,
     bg: "#121826",
-    fogNear: 200,
-    fogFar: 760,
-    env: 0.1,
+    fogNear: 380,
+    fogFar: 1000,
+    env: 0.14,
     night: 1,
     exposure: 0.98,
   },
 };
 
-export function Lighting({ choice, shadowSize, castShadow = true }: { choice: TimeChoice; shadowSize: number; castShadow?: boolean }) {
+export function Lighting({ choice, shadowSize, shadowSpan = 85, castShadow = true }: { choice: TimeChoice; shadowSize: number; shadowSpan?: number; castShadow?: boolean }) {
   const lib = worldLib();
   const sun = useRef<THREE.DirectionalLight>(null);
   const hemi = useRef<THREE.HemisphereLight>(null);
+  const span = useRef(shadowSpan);
   const { scene, gl } = useThree();
+
+  // three only allocates a shadow map when it finds one missing, so a changed
+  // mapSize (an adaptive tier step) is ignored until the old target is gone.
+  useEffect(() => {
+    const s = sun.current;
+    if (!s?.shadow.map) return;
+    s.shadow.map.dispose();
+    (s.shadow as unknown as { map: THREE.WebGLRenderTarget | null }).map = null;
+  }, [shadowSize]);
 
   const cur = useMemo(() => {
     const rig = RIGS[choice === "auto" ? timeFromClock() : choice];
@@ -124,6 +138,13 @@ export function Lighting({ choice, shadowSize, castShadow = true }: { choice: Ti
 
   const fog = useMemo(() => new THREE.Fog(cur.bg.clone(), cur.fogNear, cur.fogFar), []); // eslint-disable-line react-hooks/exhaustive-deps
   const bg = useMemo(() => cur.bg.clone(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Fog is part of every material's shader, so it must be on the scene before
+  // the world compiles (Scene.tsx compiles each stage as it mounts), not on the
+  // first frame, or each program would be built twice.
+  useLayoutEffect(() => {
+    scene.fog = fog;
+    scene.background = bg;
+  }, [scene, fog, bg]);
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1);
@@ -154,6 +175,18 @@ export function Lighting({ choice, shadowSize, castShadow = true }: { choice: Ti
       s.position.set(f.x + cur.sunDir.x * 180, cur.sunDir.y * 180, f.z + cur.sunDir.z * 180);
       s.target.position.set(f.x, 0, f.z);
       s.target.updateMatrixWorld();
+      // A frustum sized for the widest shot spends its whole map on scenery
+      // that is off-screen, and a half-inch lip's shadow becomes stairsteps.
+      // Track the camera's framing instead; the floor keeps tall casters
+      // (houses, oaks) inside the box at the closest beats.
+      const want = THREE.MathUtils.clamp(walkState.view * 1.3, 14, shadowSpan);
+      span.current = THREE.MathUtils.damp(span.current, want, 3, dt);
+      const sc = s.shadow.camera as THREE.OrthographicCamera;
+      sc.left = -span.current;
+      sc.right = span.current;
+      sc.top = span.current;
+      sc.bottom = -span.current;
+      sc.updateProjectionMatrix();
     }
     const h = hemi.current;
     if (h) {
@@ -165,8 +198,6 @@ export function Lighting({ choice, shadowSize, castShadow = true }: { choice: Ti
     fog.near = cur.fogNear;
     fog.far = cur.fogFar;
     bg.copy(cur.bg);
-    scene.fog = fog;
-    scene.background = bg;
     scene.environmentIntensity = cur.env;
     gl.toneMappingExposure = cur.exposure;
 
@@ -185,10 +216,10 @@ export function Lighting({ choice, shadowSize, castShadow = true }: { choice: Ti
         ref={sun}
         castShadow={castShadow}
         shadow-mapSize={[shadowSize, shadowSize]}
-        shadow-camera-left={-85}
-        shadow-camera-right={85}
-        shadow-camera-top={85}
-        shadow-camera-bottom={-85}
+        shadow-camera-left={-shadowSpan}
+        shadow-camera-right={shadowSpan}
+        shadow-camera-top={shadowSpan}
+        shadow-camera-bottom={-shadowSpan}
         shadow-camera-near={20}
         shadow-camera-far={460}
         shadow-bias={-0.0004}

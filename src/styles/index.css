@@ -10,8 +10,11 @@
  */
 @layer vendor, site, theme, base, utilities;
 
+@import "./fonts.css";
+
 @import "mapbox-gl/dist/mapbox-gl.css" layer(vendor);
 @import "./global.css" layer(site);
+@import "./site.css" layer(site);
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
@@ -24,10 +27,12 @@
    back to Times New Roman. Same for --font-mono. Never alias a theme key
    to a CSS variable of the same name. */
 @theme inline {
-  --font-serif: "Overpass", "Segoe UI", system-ui, Roboto, sans-serif;
-  --font-sans: "Overpass", "Segoe UI", system-ui, Roboto, sans-serif;
+  --font-serif: "Libre Franklin", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: "Libre Franklin", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "Overpass Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
+  --color-bg: var(--bg);
+  --color-accent-strong: var(--accent-strong);
   --color-field: var(--field);
   --color-field-2: var(--field-2);
   --color-field-3: var(--field-3);
@@ -71,8 +76,8 @@
   --color-secondary-foreground: var(--ink);
   --color-muted: var(--field-2);
   --color-muted-foreground: var(--ink-mute);
-  --color-accent: var(--olive-100);
-  --color-accent-foreground: var(--olive-900);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--ink-on-dark);
   --color-destructive: var(--danger);
   --color-border: var(--line);
   --color-input: var(--line);

@@ -1,12 +1,14 @@
+import * as Linking from "expo-linking";
 import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { LiveGps } from "../lib/location";
 import { C, TONE_COLOR, accuracyTone } from "../theme";
 
 /**
  * The little truth panel over the camera: how good the fix is right now,
  * which way the camera faces, and a plain warning when the OS is only giving
- * us coarse location. Shown on every capture surface.
+ * us coarse location. Shown on every capture surface. With location off, the
+ * pill itself is the way back: it re-asks, or opens Settings once iOS won't.
  */
 export function GpsHud({ gps, compact }: { gps: LiveGps; compact?: boolean }) {
   // The panel only re-renders when a fix arrives, so if the GPS goes quiet (a garage, a
@@ -29,13 +31,27 @@ export function GpsHud({ gps, compact }: { gps: LiveGps; compact?: boolean }) {
   else if (acc == null) label = "GPS locked";
   else label = `GPS ±${acc < 1 ? "<1" : Math.round(acc)} m`;
   const age = gps.best ? Math.round((Date.now() - gps.best.at) / 1000) : null;
+  const needsSettings = gps.canAskAgain === false;
   return (
     <View style={[styles.wrap, compact ? styles.compact : null]}>
-      <View style={styles.pill}>
-        <View style={[styles.dot, { backgroundColor: color }]} />
-        <Text style={styles.pillText}>{label}</Text>
-        {age != null && age > 15 ? <Text style={[styles.pillText, { color: C.sevModerate }]}> · {age}s old</Text> : null}
-      </View>
+      {gps.status === "denied" ? (
+        <Pressable
+          onPress={() => (needsSettings ? void Linking.openSettings() : gps.retry())}
+          style={[styles.pill, styles.action]}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={needsSettings ? "Location is off. Open Settings to turn it on." : "Location is off. Allow location."}
+        >
+          <View style={[styles.dot, { backgroundColor: color }]} />
+          <Text style={styles.pillText}>{label} · {needsSettings ? "Open Settings" : "Allow"}</Text>
+        </Pressable>
+      ) : (
+        <View style={styles.pill}>
+          <View style={[styles.dot, { backgroundColor: color }]} />
+          <Text style={styles.pillText}>{label}</Text>
+          {age != null && age > 15 ? <Text style={[styles.pillText, { color: C.sevModerate }]}> · {age}s old</Text> : null}
+        </View>
+      )}
       {gps.headingDeg != null ? (
         <View style={styles.pill}>
           <Text style={styles.pillText}>{cardinal(gps.headingDeg)} {Math.round(gps.headingDeg)}°</Text>
@@ -59,6 +75,7 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   compact: { gap: 4 },
   pill: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(38,40,28,0.72)", paddingVertical: 5, paddingHorizontal: 10, borderRadius: 999 },
+  action: { minHeight: 36, backgroundColor: "rgba(176,67,42,0.9)" },
   pillText: { color: C.inkOnDark, fontSize: 12.5, fontWeight: "600", fontVariant: ["tabular-nums"] },
   dot: { width: 8, height: 8, borderRadius: 4 },
 });

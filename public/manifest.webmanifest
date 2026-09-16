@@ -1,9 +1,9 @@
 {
   "name": "SideQuest ATX",
   "short_name": "SideQuest",
-  "description": "Photograph sidewalk hazards in Austin. AI classifies them; the community tracks them until they are fixed.",
+  "description": "Austin's live map of broken, blocked and missing sidewalks, each tracked until it is fixed.",
   "id": "/app",
-  "start_url": "/app",
+  "start_url": "/map",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -16,7 +16,7 @@
     { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ],
   "shortcuts": [
-    { "name": "Report a hazard", "url": "/app/report", "description": "Photograph a sidewalk hazard" },
-    { "name": "Start a Quest Drive", "url": "/app/drive", "description": "Passenger-seat batch capture" }
+    { "name": "Live map", "url": "/map", "description": "Every reported sidewalk hazard in Austin" },
+    { "name": "Open data", "url": "/data", "description": "Download the reports as CSV or GeoJSON" }
   ]
 }

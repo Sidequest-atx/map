@@ -23,7 +23,7 @@ type L = {
 
 const LABELS: L[] = [
   { f: (GAPS[0][0] + GAPS[0][1]) / 2, text: "never built", lat: 3, dy: 1.2 },
-  { f: BEATS.broken, text: "failing the test", lat: 3.4, dy: 1 },
+  { f: BEATS.broken, text: "failing the test", lat: 2.3, dy: 0.75, range: 22 },
   { f: BEATS.math - 0.006, text: "patched: someone reported it", lat: 3.2, dy: 1 },
   { f: 0.555, text: "nobody reported this one", lat: -3, dy: 0.8 },
   { f: BEATS.falls, text: "½ in", sub: "is all it takes", lat: -3.6, dy: 1.4, boxed: true },

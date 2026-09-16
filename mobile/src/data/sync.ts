@@ -19,6 +19,8 @@ import { getStore } from "./store";
  *   no-op if the row never landed, so deleting mid-upload leaves no ghost).
  * - Pull rewrites moderation fields from the server; pixels never leave/return.
  * - One failing row is recorded and skipped, never allowed to wedge the rest.
+ * - Rows upload only under the account that captured them (ownerId). Captures
+ *   from before owners were recorded are adopted by the first account to sync.
  *
  * Everything is idempotent (client_id is unique server-side), so a retry
  * after a dropped connection can never duplicate a report.
@@ -26,13 +28,16 @@ import { getStore } from "./store";
 
 export interface SyncStatus {
   running: boolean;
-  /** Rows waiting to reach the shared map (plus pending deletions) */
+  /** This account's rows waiting to reach the shared map (plus pending deletions) */
   pending: number;
+  /** Rows captured under another account on this phone; they wait for that person to sign in */
+  waitingForOthers: number;
   lastSyncAt: string | null;
+  /** Raw text of the first failure in the last pass (Settings shows a plain version) */
   lastError: string | null;
 }
 
-let status: SyncStatus = { running: false, pending: 0, lastSyncAt: null, lastError: null };
+let status: SyncStatus = { running: false, pending: 0, waitingForOthers: 0, lastSyncAt: null, lastError: null };
 const listeners = new Set<() => void>();
 
 function setStatus(patch: Partial<SyncStatus>) {
@@ -60,9 +65,27 @@ function isDirty(r: HazardReport): boolean {
   return (r.dirtyFields?.length ?? 0) > 0;
 }
 
-function pendingCount(): number {
+/** Rows with no owner are pre-ownership captures: whoever syncs next adopts them. */
+function mine(row: { ownerId?: string }, uid: string | null): boolean {
+  return !row.ownerId || (uid !== null && row.ownerId === uid);
+}
+
+function counts(): { pending: number; waitingForOthers: number } {
   const store = getStore();
-  return store.list().filter(isDirty).length + store.tombstones().length;
+  const uid = getSession()?.userId ?? null;
+  let pending = 0;
+  let waitingForOthers = 0;
+  for (const r of store.list()) {
+    if (!isDirty(r)) continue;
+    if (mine(r, uid)) pending++;
+    else waitingForOthers++;
+  }
+  for (const t of store.tombstones()) if (mine(t, uid)) pending++;
+  return { pending, waitingForOthers };
+}
+
+function pendingCount(): number {
+  return counts().pending;
 }
 
 /* ---------------- base64 ---------------- */
@@ -219,7 +242,7 @@ async function pushDrives(uid: string, name: string): Promise<void> {
   const done = new Set(syncedDrivesDoc.read());
   const drives = getStore()
     .drives()
-    .filter((d) => d.endedAt && !done.has(d.id));
+    .filter((d) => d.endedAt && d.ownerId === uid && !done.has(d.id));
   for (const d of drives) {
     const { error } = await supabase()
       .from("sq_drives")
@@ -299,20 +322,23 @@ export async function syncNow(): Promise<void> {
   const session = getSession();
   const store = getStore();
   if (!session?.userId) {
-    setStatus({ pending: pendingCount(), lastError: null });
+    setStatus({ ...counts(), lastError: null });
     return;
   }
   if (status.running) return;
-  setStatus({ running: true, lastError: null, pending: pendingCount() });
   const uid = session.userId;
+  store.claimLegacy(uid);
+  setStatus({ running: true, lastError: null, ...counts() });
   let firstError: string | null = null;
   const fail = (what: string, e: unknown) => {
+    console.warn("[sync]", what, e);
     if (!firstError) firstError = `${what}: ${e instanceof Error ? e.message : String(e)}`;
   };
 
   // Deletions first, so a deleted-then-recaptured spot cannot bounce back in.
   // Each item is tried on its own: one poison row must never wedge the rest.
   for (const t of store.tombstones()) {
+    if (t.ownerId !== uid) continue; // another account's deletion waits for that person
     try {
       const del = t.remoteId
         ? await supabase().from("sq_reports").delete().eq("id", t.remoteId)
@@ -333,7 +359,7 @@ export async function syncNow(): Promise<void> {
   for (const r of store.list()) if (r.remoteId) remoteIdByLocal.set(r.id, r.remoteId);
   const dirty = store
     .list()
-    .filter(isDirty)
+    .filter((r) => isDirty(r) && r.ownerId === uid)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   for (const r of dirty) {
     try {
@@ -341,7 +367,7 @@ export async function syncNow(): Promise<void> {
     } catch (e) {
       fail(r.ref, e);
     }
-    setStatus({ pending: pendingCount() });
+    setStatus(counts());
   }
 
   try {
@@ -357,7 +383,7 @@ export async function syncNow(): Promise<void> {
 
   setStatus({
     running: false,
-    pending: pendingCount(),
+    ...counts(),
     lastSyncAt: firstError ? status.lastSyncAt : new Date().toISOString(),
     lastError: firstError,
   });
@@ -377,16 +403,18 @@ function kick(delayMs = 1500) {
 export function startSync(): void {
   if (started) return;
   started = true;
-  setStatus({ pending: pendingCount() });
+  setStatus(counts());
   getStore().subscribe(() => {
-    setStatus({ pending: pendingCount() });
-    if (pendingCount() > 0) kick();
+    const c = counts();
+    setStatus(c);
+    if (c.pending > 0) kick();
   });
   AppState.addEventListener("change", (s) => {
     if (s === "active") kick(300);
   });
   // Captures queued while signed out go up the moment a session appears.
   supabase().auth.onAuthStateChange((event) => {
+    setStatus(counts());
     if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") kick(1000);
   });
   // Belt-and-braces retry while something is stuck (e.g. captured offline).

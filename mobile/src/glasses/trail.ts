@@ -23,6 +23,8 @@ export interface ActiveWalk {
   startedAt: string;
   /** true when background updates were granted; false = foreground only */
   background: boolean;
+  /** Set when the walk ends; it stays until the photos are imported or it is discarded, so the screen reopens in review */
+  endedAt?: string;
 }
 
 const activeDoc = new JsonDoc<ActiveWalk | null>("walk-active.json", () => null);
@@ -62,7 +64,8 @@ TaskManager.defineTask(WALK_TASK, async ({ data, error }: { data?: { locations?:
   }
   const locs = data?.locations ?? [];
   if (!locs.length) return;
-  if (!activeDoc.read()) return; // a stale registration after a crash: ignore
+  const active = activeDoc.read();
+  if (!active || active.endedAt) return; // a stale registration after a crash, or a late batch after the walk ended
   appendLocations(locs);
 });
 
@@ -84,9 +87,13 @@ export function readTrail(): TrailPoint[] {
   return pts;
 }
 
-export async function startWalk(walker: string, id: string): Promise<{ ok: true; walk: ActiveWalk } | { ok: false; reason: string }> {
+export async function startWalk(walker: string, id: string): Promise<{ ok: true; walk: ActiveWalk } | { ok: false; reason: string; needsSettings?: boolean }> {
   const fg = await Location.requestForegroundPermissionsAsync();
-  if (!fg.granted) return { ok: false, reason: "Location permission is required to record the trail." };
+  if (!fg.granted) {
+    return fg.canAskAgain
+      ? { ok: false, reason: "Location permission is required to record the trail." }
+      : { ok: false, reason: "Location is off for SideQuest. Turn it on in Settings to record the trail.", needsSettings: true };
+  }
   let background = false;
   try {
     const bg = await Location.requestBackgroundPermissionsAsync();
@@ -126,12 +133,17 @@ export async function startWalk(walker: string, id: string): Promise<{ ok: true;
   return { ok: true, walk };
 }
 
+/** Stops the trail and records the end time (kept until import or discard). */
 export async function stopWalk(): Promise<{ walk: ActiveWalk | null; trail: TrailPoint[] }> {
-  const walk = activeDoc.read();
+  let walk = activeDoc.read();
   try {
     if (await Location.hasStartedLocationUpdatesAsync(WALK_TASK)) await Location.stopLocationUpdatesAsync(WALK_TASK);
   } catch {
     /* not running */
+  }
+  if (walk && !walk.endedAt) {
+    walk = { ...walk, endedAt: new Date().toISOString() };
+    activeDoc.write(walk);
   }
   const trail = readTrail();
   return { walk, trail };
@@ -149,7 +161,7 @@ export async function reconcileOnLaunch(): Promise<void> {
   const walk = activeDoc.read();
   try {
     const running = await Location.hasStartedLocationUpdatesAsync(WALK_TASK);
-    if (running && !walk) await Location.stopLocationUpdatesAsync(WALK_TASK);
+    if (running && (!walk || walk.endedAt)) await Location.stopLocationUpdatesAsync(WALK_TASK);
   } catch {
     /* ignore */
   }

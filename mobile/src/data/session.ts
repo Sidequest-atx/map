@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { Session as SupabaseSession } from "@supabase/supabase-js";
+import { isAuthRetryableFetchError, type Session as SupabaseSession } from "@supabase/supabase-js";
 import { useSyncExternalStore } from "react";
 import { AppState } from "react-native";
 import { supabase } from "../lib/supabase";
@@ -26,6 +26,21 @@ const doc = new JsonDoc<Session | null>("session.json", () => null);
 const listeners = new Set<() => void>();
 let current: Session | null = doc.read();
 
+/**
+ * Bumped by every sign-out on this phone. The offline startup read can take
+ * ~25 s to settle; if the person signed out meanwhile, that late result must
+ * not bring the old session back.
+ */
+let signOutEpoch = 0;
+
+/**
+ * A password reset signs the account in when the emailed code is verified,
+ * before the new password is saved. Holding the UI on the reset screen until
+ * the update lands means a rejected password (too weak, same as before) can be
+ * fixed right there instead of silently keeping the old one.
+ */
+let resetHold: { session: SupabaseSession | null } | null = null;
+
 function emit() {
   listeners.forEach((l) => l());
 }
@@ -33,10 +48,8 @@ function emit() {
 function fromSupabase(s: SupabaseSession | null): Session | null {
   if (!s) return null;
   const meta = (s.user.app_metadata ?? {}) as { sq_role?: string };
-  const name =
-    (s.user.user_metadata as { display_name?: string } | null)?.display_name?.trim() ||
-    s.user.email?.split("@")[0] ||
-    "Quester";
+  // This name is printed on public reports, so it never falls back to the email handle.
+  const name = (s.user.user_metadata as { display_name?: string } | null)?.display_name?.trim() || "Quester";
   return {
     name,
     role: meta.sq_role === "moderator" ? "moderator" : "reporter",
@@ -54,16 +67,32 @@ function set(next: Session | null) {
 }
 
 // Adopt the persisted Supabase session (AsyncStorage) and follow changes.
-// The JsonDoc mirror covers the async gap before this resolves.
+// The JsonDoc mirror covers the async gap before this resolves, and keeps the
+// phone signed in while it is offline.
+const startupEpoch = signOutEpoch;
 void supabase()
   .auth.getSession()
-  .then(({ data }) => {
+  .then(({ data, error }) => {
+    if (signOutEpoch !== startupEpoch || resetHold) return;
+    // Offline with an expired access token: auth-js keeps the refresh token and
+    // restores the session (TOKEN_REFRESHED) once the network is back. Keep the mirror.
+    if (!data.session && error && isAuthRetryableFetchError(error)) return;
     const s = fromSupabase(data.session);
     // Signed out remotely (or token pruned): drop the stale mirror.
     if (JSON.stringify(s) !== JSON.stringify(current)) set(s);
   })
   .catch(() => undefined);
-supabase().auth.onAuthStateChange((_event, s) => {
+supabase().auth.onAuthStateChange((event, s) => {
+  if (resetHold) {
+    if (s) resetHold.session = s;
+    return;
+  }
+  // Only an explicit SIGNED_OUT ends the session: auth-js emits it whenever it
+  // really removes one (revoked or expired refresh token, signOut). A null
+  // INITIAL_SESSION can just mean "offline, couldn't refresh yet".
+  if (!s && event !== "SIGNED_OUT") return;
+  // The startup read settling after the person already signed out on this phone.
+  if (s && event === "INITIAL_SESSION" && signOutEpoch > 0) return;
   const next = fromSupabase(s);
   if (JSON.stringify(next) !== JSON.stringify(current)) set(next);
 });
@@ -80,9 +109,15 @@ export function getSession(): Session | null {
   return current;
 }
 
+function rememberEmail(email: string) {
+  setPrefs({ lastEmail: email.trim().toLowerCase() });
+}
+
+/** Throws the original AuthError so the screen can show a plain-language message for its code. */
 export async function signInWithPassword(email: string, password: string): Promise<void> {
   const { error } = await supabase().auth.signInWithPassword({ email: email.trim(), password });
-  if (error) throw new Error(error.message);
+  if (error) throw error;
+  rememberEmail(email);
 }
 
 export async function signUpWithPassword(name: string, email: string, password: string): Promise<void> {
@@ -91,18 +126,66 @@ export async function signUpWithPassword(name: string, email: string, password: 
     password,
     options: { data: { display_name: name.trim() } },
   });
-  if (error) throw new Error(error.message);
-  if (!data.session) throw new Error("Account created — confirm the email we sent, then sign in.");
+  if (error) throw error;
+  rememberEmail(email);
+  if (!data.session) {
+    const pending = new Error("Account created. Confirm the email we sent, then sign in.");
+    pending.name = "ConfirmEmailPending";
+    throw pending;
+  }
+}
+
+/**
+ * Emails a recovery code. No deep link is involved: the Recovery email template
+ * must include {{ .Token }}. Supabase answers the same way whether or not the
+ * address has an account, so the screen never reveals which emails exist.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const { error } = await supabase().auth.resetPasswordForEmail(email.trim());
+  if (error) throw error;
+}
+
+/** Verifies the emailed code, saves the new password, then signs in. */
+export async function confirmPasswordReset(email: string, code: string, password: string): Promise<void> {
+  if (!resetHold) resetHold = { session: null };
+  try {
+    if (!resetHold.session) {
+      const { data, error } = await supabase().auth.verifyOtp({ email: email.trim(), token: code.trim(), type: "recovery" });
+      if (error) throw error;
+      resetHold.session = data.session;
+    }
+    const { error } = await supabase().auth.updateUser({ password });
+    if (error) throw error;
+  } catch (e) {
+    // The code itself failed: nothing is signed in, nothing to hold.
+    if (!resetHold?.session) resetHold = null;
+    throw e;
+  }
+  const { data } = await supabase().auth.getSession();
+  const s = data.session ?? resetHold?.session ?? null;
+  resetHold = null;
+  rememberEmail(email);
+  set(fromSupabase(s));
+}
+
+/** Leaving the reset screen: a code-verified session that never got its new password is signed out. */
+export function cancelPasswordReset(): void {
+  const held = resetHold?.session;
+  resetHold = null;
+  if (held) void supabase().auth.signOut({ scope: "local" }).catch(() => undefined);
 }
 
 export function signOut() {
+  signOutEpoch += 1;
   set(null);
   // Best-effort server-side revoke. If it fails (offline), supabase-js keeps
   // its AsyncStorage session and would silently sign the user back in on the
   // next cold start — so clear that storage ourselves on any failure.
   const wipe = () => void AsyncStorage.removeItem("sidequest-atx-auth").catch(() => undefined);
+  // Local scope: signing out of the phone must not sign the same account out
+  // of the website (the default, 'global', revokes every session).
   supabase()
-    .auth.signOut()
+    .auth.signOut({ scope: "local" })
     .then(({ error }) => {
       if (error) wipe();
     })
@@ -136,6 +219,8 @@ export interface Prefs {
   glassesClockOffsetS: number;
   /** Auto-capture interval for Quest Drives */
   driveIntervalS: 0 | 5 | 10;
+  /** Email of the last account that signed in here: the sign-in screen opens on "Sign in" with it filled */
+  lastEmail?: string;
 }
 
 const DEFAULT_PREFS: Prefs = { saveToPhotos: true, glassesClockOffsetS: 0, driveIntervalS: 5 };

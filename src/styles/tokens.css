@@ -1,63 +1,69 @@
 /* SideQuest ATX design tokens
-   Palette: committed olive on a visibly tinted beige field.
-   Light theme only (used outdoors in Texas sun and at a city desk). */
+   White page, charcoal ink, olive as the single accent that also drenches the
+   statement bands (the institutional grammar of utexas.edu, in this brand's
+   color). Severity keeps olive / ochre / rust. Light theme only: the site is
+   read outdoors in Texas sun and at a city desk. All colors OKLCH. */
 
 :root {
-  /* Field + surfaces */
-  --field: oklch(0.93 0.025 90);
-  --field-2: oklch(0.895 0.03 92);
-  --field-3: oklch(0.86 0.035 92);
-  --surface: oklch(0.975 0.012 92);
-  --line: oklch(0.80 0.03 95);
-  --line-strong: oklch(0.68 0.035 100);
+  /* Page + surfaces (chroma near zero: the warmth lives in olive, type and photos) */
+  --bg: oklch(1 0 0);
+  --surface: oklch(1 0 0);
+  --field: oklch(0.965 0.004 110);
+  --field-2: oklch(0.94 0.006 110);
+  --field-3: oklch(0.905 0.008 110);
+  --line: oklch(0.88 0.008 110);
+  --line-strong: oklch(0.72 0.012 110);
 
   /* Olive ramp */
-  --olive-50: oklch(0.92 0.045 118);
-  --olive-100: oklch(0.86 0.06 120);
-  --olive-200: oklch(0.78 0.08 121);
-  --olive-300: oklch(0.705 0.09 121);
-  --olive-400: oklch(0.63 0.10 122);
-  --olive-500: oklch(0.55 0.10 122);
-  --olive-600: oklch(0.47 0.09 123);
-  --olive-700: oklch(0.395 0.075 124);
-  --olive-800: oklch(0.32 0.06 125);
-  --olive-900: oklch(0.25 0.045 125);
+  --olive-50: oklch(0.94 0.035 120);
+  --olive-100: oklch(0.88 0.055 120);
+  --olive-200: oklch(0.79 0.08 121);
+  --olive-300: oklch(0.71 0.095 121);
+  --olive-400: oklch(0.63 0.105 122);
+  --olive-500: oklch(0.55 0.105 122);
+  --olive-600: oklch(0.47 0.1 123);
+  --olive-700: oklch(0.405 0.09 124);
+  --olive-800: oklch(0.33 0.07 125);
+  --olive-900: oklch(0.25 0.05 125);
+
+  /* The accent role: links, numbers, primary actions */
+  --accent: var(--olive-700);
+  --accent-strong: var(--olive-800);
 
   /* Ink */
-  --ink: oklch(0.22 0.02 110);
-  --ink-soft: oklch(0.42 0.03 110);
-  --ink-mute: oklch(0.55 0.03 105);
-  --ink-on-dark: oklch(0.95 0.02 95);
-  --ink-on-dark-soft: oklch(0.82 0.035 100);
+  --ink: oklch(0.24 0.012 110);
+  --ink-soft: oklch(0.4 0.014 110);
+  --ink-mute: oklch(0.47 0.014 110); /* ≥ 4.5:1 on white and the fields (WCAG AA) */
+  --ink-on-dark: oklch(0.985 0.005 95);
+  --ink-on-dark-soft: oklch(0.88 0.02 100);
 
   /* Semantic */
   --sev-low: var(--olive-500);
   --sev-moderate: oklch(0.68 0.14 75);
   --sev-severe: oklch(0.52 0.17 35);
-  --ok: oklch(0.50 0.11 150);
-  --info: oklch(0.50 0.07 230);
+  --ok: oklch(0.5 0.11 150);
+  --info: oklch(0.5 0.07 230);
   --danger: var(--sev-severe);
 
-  --sev-low-bg: oklch(0.90 0.05 120);
-  --sev-moderate-bg: oklch(0.92 0.06 80);
-  --sev-severe-bg: oklch(0.91 0.05 35);
-  --ok-bg: oklch(0.91 0.05 150);
-  --info-bg: oklch(0.92 0.03 230);
+  --sev-low-bg: oklch(0.92 0.045 120);
+  --sev-moderate-bg: oklch(0.93 0.055 80);
+  --sev-severe-bg: oklch(0.92 0.045 35);
+  --ok-bg: oklch(0.92 0.045 150);
+  --info-bg: oklch(0.93 0.03 230);
 
-  /* Type */
-  /* Overpass, one superfamily in three roles (display+body via the old
-     serif slot and --font-ui, Overpass Mono for annotations). Chosen for
-     provenance, not neutrality: Overpass is derived from Highway Gothic,
-     the FHWA typeface on US road signage — the letterforms of American
-     street infrastructure, on a product about street infrastructure. */
-  --font-serif: "Overpass", "Segoe UI", system-ui, Roboto, sans-serif;
-  --font-ui: "Overpass", "Segoe UI", system-ui, Roboto, sans-serif;
+  /* Type: one family, committed weight contrast. Libre Franklin is the open
+     Franklin Gothic, the American civic grotesque (and the face utexas.edu
+     sets its own site in). Black weight carries the display; regular carries
+     the body. Overpass Mono stays for tabular data chips only. */
+  --font-sans: "Libre Franklin", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: var(--font-sans);
+  --font-ui: var(--font-sans);
   --font-mono: "Overpass Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  /* Radii */
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 14px;
+  /* Radii: squared-off, institutional */
+  --r-sm: 2px;
+  --r-md: 3px;
+  --r-lg: 6px;
   --r-pill: 999px;
 
   /* Motion */
@@ -77,17 +83,17 @@
   --z-toast: 60;
 
   /* Shadows: shallow, olive-tinted */
-  --shadow-1: 0 1px 2px oklch(0.25 0.04 120 / 0.10);
+  --shadow-1: 0 1px 2px oklch(0.25 0.04 120 / 0.1);
   --shadow-2: 0 4px 8px -2px oklch(0.25 0.04 120 / 0.14);
   --shadow-sheet: 0 -6px 16px -8px oklch(0.25 0.04 120 / 0.25);
 
   /* Layout */
-  --content: 72rem;
+  --content: 76rem;
   --prose: 66ch;
   --gutter: clamp(1rem, 4vw, 2.5rem);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
-  --topbar-h: 3.75rem;
+  --topbar-h: 4.5rem;
 
   color-scheme: light;
 }

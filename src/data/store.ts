@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from "react";
+import { toast } from "../components/Toast";
 import { makeRef } from "../lib/format";
 import { DEMO } from "../lib/supabase";
-import type { DriveSession, HazardReport, ReportStatus } from "../types";
+import { STATUS_LABELS, type DriveSession, type HazardReport, type ReportStatus } from "../types";
 import { SupabaseStore } from "./remote";
 import { DEMO_REPORTER, SEED_DRIVES, SEED_REPORTS } from "./seed";
 
@@ -13,7 +14,15 @@ import { DEMO_REPORTER, SEED_DRIVES, SEED_REPORTS } from "./seed";
  * Rules the store enforces regardless of backend:
  *  - a report cannot become "resolved" without an after-photo
  *  - status only moves along STATUS_FLOW (or back to open on reopen)
+ *  - reopening clears the close-out (who resolved it, the after-photo, verification)
  */
+export interface LoadState {
+  /** the first fetch has landed */
+  loaded: boolean;
+  /** why the latest fetch failed, if it did */
+  error: string | null;
+}
+
 export interface ReportStore {
   list(): HazardReport[];
   get(id: string): HazardReport | undefined;
@@ -21,14 +30,18 @@ export interface ReportStore {
   nextRef(): string;
   add(report: Omit<HazardReport, "ref"> & { ref?: string }): HazardReport;
   addMany(reports: (Omit<HazardReport, "ref"> & { ref?: string })[], drive?: DriveSession): HazardReport[];
-  update(id: string, patch: Partial<HazardReport>): void;
+  /** successToast is shown once the change is actually saved */
+  update(id: string, patch: Partial<HazardReport>, opts?: { successToast?: string }): void;
   setStatus(id: string, status: ReportStatus, meta?: { ticket311?: string; afterPhoto?: string; by?: string; verified?: boolean }): { ok: true } | { ok: false; reason: string };
+  loadState(): LoadState;
+  reload(): void;
   resetDemo(): void;
   subscribe(listener: () => void): () => void;
 }
 
 const KEY = "sidequest-atx:reports:v2";
 const DRIVES_KEY = "sidequest-atx:drives:v1";
+const LOCAL_READY: LoadState = { loaded: true, error: null };
 
 class LocalStorageStore implements ReportStore {
   private reports: HazardReport[];
@@ -127,11 +140,12 @@ class LocalStorageStore implements ReportStore {
     return out;
   }
 
-  update(id: string, patch: Partial<HazardReport>) {
+  update(id: string, patch: Partial<HazardReport>, opts?: { successToast?: string }) {
     const r = this.reports.find((x) => x.id === id);
     if (!r) return;
     Object.assign(r, patch, { updatedAt: new Date().toISOString() });
     this.persist();
+    if (opts?.successToast) toast(opts.successToast, "ok");
   }
 
   setStatus(id: string, status: ReportStatus, meta: { ticket311?: string; afterPhoto?: string; by?: string; verified?: boolean } = {}) {
@@ -141,6 +155,7 @@ class LocalStorageStore implements ReportStore {
       return { ok: false as const, reason: "An after-photo is required to resolve a report." };
     }
     const now = new Date().toISOString();
+    const reopening = r.status === "resolved" && status !== "resolved";
     r.status = status;
     r.updatedAt = now;
     if (meta.ticket311) r.ticket311 = meta.ticket311;
@@ -149,13 +164,24 @@ class LocalStorageStore implements ReportStore {
       r.resolvedAt = now;
       r.resolvedBy = meta.by ?? r.resolvedBy ?? "moderator";
       r.verified = meta.verified ?? r.verified ?? false;
-    } else if (r.resolvedAt) {
-      // reopened
+    } else if (reopening || r.resolvedAt) {
+      // reopened: the old close-out no longer applies
       r.resolvedAt = undefined;
+      r.resolvedBy = undefined;
+      r.afterPhoto = undefined;
       r.verified = false;
     }
     this.persist();
+    toast(`${r.ref} → ${STATUS_LABELS[status]}`, "ok");
     return { ok: true as const };
+  }
+
+  loadState() {
+    return LOCAL_READY;
+  }
+
+  reload() {
+    // nothing to fetch: the demo data lives in this browser
   }
 
   resetDemo() {
@@ -186,6 +212,13 @@ export function useDrives(): DriveSession[] {
   const store = getStore();
   const subscribe = store.subscribe.bind(store);
   return useSyncExternalStore(subscribe, () => store.drives(), () => store.drives());
+}
+
+/** Whether reports have loaded, and why the last fetch failed if it did. */
+export function useLoadState(): LoadState {
+  const store = getStore();
+  const subscribe = store.subscribe.bind(store);
+  return useSyncExternalStore(subscribe, () => store.loadState(), () => store.loadState());
 }
 
 export function isDemo(r: HazardReport): boolean {

@@ -35,6 +35,9 @@ export function AppLayout() {
 
   return (
     <div className="app ui">
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
       <header className="app-bar">
         <Link to="/" className="brand" viewTransition>
           <Mark />
@@ -50,7 +53,7 @@ export function AppLayout() {
             </Link>
           )}
           {session && (
-            <button className="btn btn--sm btn--ghost" onClick={signOut}>
+            <button className="btn btn--sm btn--ghost" onClick={() => signOut()}>
               Sign out
             </button>
           )}
@@ -62,12 +65,12 @@ export function AppLayout() {
 
       {offline && (
         <div className="notice notice--warn" role="status" style={{ borderRadius: 0, justifyContent: "center" }}>
-          You are offline. Changes will not reach the map until the connection returns.
+          You're offline. Moderation changes can't be saved until the connection returns.
         </div>
       )}
 
-      <main className={`app-main ${isPortal ? "app-main--wide" : ""}`}>
-        <ErrorBoundary home="/">
+      <main id="main" tabIndex={-1} className={`app-main ${isPortal ? "app-main--wide" : ""}`}>
+        <ErrorBoundary home="/" resetKey={pathname}>
           <Outlet />
         </ErrorBoundary>
       </main>

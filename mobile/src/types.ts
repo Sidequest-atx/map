@@ -82,6 +82,8 @@ export interface HazardReport {
   syncedAt?: string;
   /** Field names changed locally since the last push (drives what re-syncs, so a phone push can never clobber columns it did not touch) */
   dirtyFields?: string[];
+  /** Supabase user id of the account signed in at capture; only that account uploads it (see sync.ts) */
+  ownerId?: string;
   /** When the photo was taken (ISO) */
   createdAt: string;
   updatedAt: string;
@@ -90,6 +92,8 @@ export interface HazardReport {
 export interface DriveSession {
   id: string;
   captain: string;
+  /** Supabase user id of the account that drove it; only that account uploads it */
+  ownerId?: string;
   startedAt: string;
   endedAt?: string;
   /** Breadcrumb trail [lng, lat][] */

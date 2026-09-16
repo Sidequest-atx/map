@@ -38,9 +38,14 @@ export async function findWalkPhotos(
   trail: TrailPoint[],
   window: { startMs: number; endMs: number },
   clockOffsetS = 0,
-): Promise<{ ok: true; photos: WalkPhoto[] } | { ok: false; reason: string }> {
+): Promise<{ ok: true; photos: WalkPhoto[] } | { ok: false; reason: string; needsSettings?: boolean }> {
   const perm = await MediaLibrary.requestPermissionsAsync(false, ["photo"]);
-  if (!perm.granted) return { ok: false, reason: "Photos access is needed to find the pictures taken during the walk." };
+  if (!perm.granted) {
+    // Once iOS stops asking, only the Settings app can turn Photos access back on.
+    return perm.canAskAgain
+      ? { ok: false, reason: "Photos access is needed to find the pictures taken during the walk." }
+      : { ok: false, reason: "Photos access is off for SideQuest. Turn it on in Settings to find the pictures from the walk.", needsSettings: true };
+  }
 
   const assets = await new MediaLibrary.Query()
     .eq(MediaLibrary.AssetField.MEDIA_TYPE, MediaLibrary.MediaType.IMAGE)

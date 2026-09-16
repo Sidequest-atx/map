@@ -1,6 +1,5 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, useEffect, type ErrorInfo, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Motif } from "./Motif";
 import { allDemo, useReports } from "../data/store";
 import { DEMO } from "../lib/supabase";
 import { HAZARD_SHORT, SEVERITY_LABELS, STATUS_LABELS, type HazardReport, type HazardType, type ReportStatus, type Severity } from "../types";
@@ -60,9 +59,17 @@ export function PageLoading() {
 export function NotFound() {
   const { pathname } = useLocation();
   const inApp = pathname.startsWith("/app");
+  // Unknown paths still answer 200 from the SPA host, so tell crawlers not to
+  // index this page as if it were real content.
+  useEffect(() => {
+    const meta = document.createElement("meta");
+    meta.name = "robots";
+    meta.content = "noindex";
+    document.head.appendChild(meta);
+    return () => meta.remove();
+  }, []);
   return (
-    <div className="errorpage ui has-motif">
-      <Motif kind="crack" opacity={0.12} style={{ color: "var(--olive-800)" }} />
+    <div className="errorpage ui">
       <div>
         <h1 className="h2">That page does not exist.</h1>
         <p className="muted">
@@ -81,9 +88,18 @@ export function NotFound() {
   );
 }
 
+/** A page's code chunk failed to load: almost always a deploy happened while this tab was open. */
+function isChunkLoadError(error: Error): boolean {
+  return /dynamically imported module|Importing a module script failed|error loading dynamically imported module|Expected a JavaScript/i.test(error?.message ?? "");
+}
+
+const RELOAD_KEY = "sq-chunk-reload-at";
+
 interface EBProps {
   children: ReactNode;
   home?: string;
+  /** Changing this (the route path) clears the error, so navigation recovers. */
+  resetKey?: string;
 }
 interface EBState {
   error: Error | null;
@@ -95,19 +111,37 @@ export class ErrorBoundary extends Component<EBProps, EBState> {
   }
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[SideQuest] render error", error, info.componentStack);
+    // React caches a failed lazy import, so re-rendering can't fix it; a new
+    // deploy needs a fresh page. Reload once, at most once a minute.
+    if (isChunkLoadError(error)) {
+      try {
+        const last = Number(sessionStorage.getItem(RELOAD_KEY) || 0);
+        if (Date.now() - last > 60_000) {
+          sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+          location.reload();
+        }
+      } catch {
+        /* storage blocked: fall back to the Try again button */
+      }
+    }
+  }
+  componentDidUpdate(prev: EBProps) {
+    if (this.state.error && prev.resetKey !== this.props.resetKey) this.setState({ error: null });
   }
   render() {
-    if (!this.state.error) return this.props.children;
+    const { error } = this.state;
+    if (!error) return this.props.children;
     const home = this.props.home ?? "/";
+    const chunk = isChunkLoadError(error);
     return (
       <div className="errorpage ui">
         <div>
-          <h1 className="h2">Something broke on this screen.</h1>
-          <p className="muted">Your reports are saved on this device. Try again, or go back to safe ground.</p>
-          <p className="mono small muted">{this.state.error.message}</p>
+          <h1 className="h2">{chunk ? "SideQuest was just updated." : "Something broke on this screen."}</h1>
+          <p className="muted">{chunk ? "Reload to get the new version." : "Try again, or go back to the start."}</p>
+          {!chunk && <p className="mono small muted">{error.message}</p>}
           <div className="btn-row">
-            <button className="btn btn--primary" onClick={() => this.setState({ error: null })}>
-              Try again
+            <button className="btn btn--primary" onClick={() => (chunk ? location.reload() : this.setState({ error: null }))}>
+              {chunk ? "Reload" : "Try again"}
             </button>
             <a className="btn" href={home}>
               Go home

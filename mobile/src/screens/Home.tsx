@@ -40,17 +40,25 @@ export function HomeScreen({ navigation }: ScreenProps<"Home">) {
             <Text style={T.display}>SideQuest ATX</Text>
             <Small>{session?.name} · signed in as {session?.role.replace("-", " ")}</Small>
           </View>
-          <Pressable onPress={() => navigation.navigate("Settings")} hitSlop={10} accessibilityLabel="Settings" style={styles.gear}>
-            <Text style={{ fontSize: 18 }}>⚙︎</Text>
+          <Pressable onPress={() => navigation.navigate("Settings")} hitSlop={10} accessibilityRole="button" accessibilityLabel="Settings" style={styles.gear}>
+            <Text style={{ fontSize: 18 }} accessible={false} importantForAccessibility="no">
+              ⚙︎
+            </Text>
           </Pressable>
         </Row>
 
         {walk ? (
           <Notice tone="warn">
-            <P>
-              <Text style={{ fontWeight: "700" }}>Glasses Walk in progress</Text> since {shortTime(walk.startedAt)}.{walk.background ? " Trail records in the background." : " Keep the app open; background location was not granted."}
-            </P>
-            <Button title="Open the walk" size="sm" onPress={() => navigation.navigate("GlassesWalk")} />
+            {walk.endedAt ? (
+              <P>
+                <Text style={{ fontWeight: "700" }}>Glasses Walk ended</Text> at {shortTime(walk.endedAt)}. Its photos are waiting for review.
+              </P>
+            ) : (
+              <P>
+                <Text style={{ fontWeight: "700" }}>Glasses Walk in progress</Text> since {shortTime(walk.startedAt)}.{walk.background ? " Trail records in the background." : " Keep the app open; background location was not granted."}
+              </P>
+            )}
+            <Button title={walk.endedAt ? "Review the walk" : "Open the walk"} size="sm" onPress={() => navigation.navigate("GlassesWalk")} />
           </Notice>
         ) : null}
         {queued ? (
@@ -58,7 +66,7 @@ export function HomeScreen({ navigation }: ScreenProps<"Home">) {
             <P>
               <Text style={{ fontWeight: "700" }}>Unfinished Quest Drive</Text> saved on this phone.
             </P>
-            <Button title="Resume review" size="sm" onPress={() => navigation.navigate("Drive")} />
+            <Button title="Resume review" size="sm" onPress={() => navigation.navigate("Drive", { resume: true })} />
           </Notice>
         ) : null}
 
@@ -72,13 +80,23 @@ export function HomeScreen({ navigation }: ScreenProps<"Home">) {
         </Row>
 
         <Stack gap={SP.sm}>
-          <Pressable onPress={() => navigation.navigate("Report")} style={({ pressed }) => [styles.hero, pressed ? { opacity: 0.9, transform: [{ scale: 0.985 }] } : null]} accessibilityRole="button">
-            <Text style={styles.heroGlyph}>◉</Text>
+          <Pressable
+            onPress={() => navigation.navigate("Report")}
+            style={({ pressed }) => [styles.hero, pressed ? { opacity: 0.9, transform: [{ scale: 0.985 }] } : null]}
+            accessibilityRole="button"
+            accessibilityLabel="Report a hazard"
+            accessibilityHint="Opens the camera. The exact spot is pinned for you."
+          >
+            <Text style={styles.heroGlyph} accessible={false} importantForAccessibility="no">
+              ◉
+            </Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.heroTitle}>Report a hazard</Text>
               <Text style={styles.heroSub}>One photo. The exact spot is pinned for you.</Text>
             </View>
-            <Text style={styles.heroArrow}>→</Text>
+            <Text style={styles.heroArrow} accessible={false} importantForAccessibility="no">
+              →
+            </Text>
           </Pressable>
           <Row gap={SP.sm} align="stretch">
             <ActionTile title="Glasses Walk" sub="Shoot with glasses; the phone maps it" onPress={() => navigation.navigate("GlassesWalk")} />
@@ -97,7 +115,7 @@ export function HomeScreen({ navigation }: ScreenProps<"Home">) {
 
 function ActionTile({ title, sub, onPress }: { title: string; sub: string; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.tile, pressed ? { opacity: 0.9 } : null]} accessibilityRole="button">
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.tile, pressed ? { opacity: 0.9 } : null]} accessibilityRole="button" accessibilityLabel={`${title}. ${sub}`}>
       <Text style={styles.tileTitle}>{title}</Text>
       <Text style={styles.tileSub}>{sub}</Text>
     </Pressable>

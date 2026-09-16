@@ -13,7 +13,7 @@ let seq = 0;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
-export function toast(text: string, kind: Kind = "info", ms = 3200) {
+export function toast(text: string, kind: Kind = "info", ms = kind === "danger" ? 6000 : 3200) {
   const id = ++seq;
   toasts = [...toasts, { id, text, kind }];
   emit();
@@ -36,11 +36,12 @@ export function ToastRegion() {
     () => toasts,
     () => toasts,
   );
-  if (!items.length) return null;
+  // The live region stays mounted, even when empty, so screen readers are
+  // already listening when the first message lands. Errors are alerts.
   return (
     <div className="toast-region" role="status" aria-live="polite">
       {items.map((t) => (
-        <div key={t.id} className={`toast toast--${t.kind} ${t.leaving ? "is-leaving" : ""}`}>
+        <div key={t.id} role={t.kind === "danger" ? "alert" : undefined} className={`toast toast--${t.kind} ${t.leaving ? "is-leaving" : ""}`}>
           {t.text}
         </div>
       ))}

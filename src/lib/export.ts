@@ -15,6 +15,18 @@ function download(filename: string, blob: Blob) {
 
 const stamp = () => new Date().toISOString().slice(0, 10);
 
+/**
+ * One CSV cell. Reporter-typed text that starts with = + - @ (or a tab/CR)
+ * would run as a formula when city staff open the file in Excel or Sheets,
+ * so it is prefixed with an apostrophe. Numbers (e.g. negative longitudes)
+ * are left alone.
+ */
+function csvCell(v: unknown): string {
+  let s = v == null ? "" : String(v);
+  if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 /** Public CSV: no photos, no reporter names. */
 export function exportCsv(reports: HazardReport[]) {
   const cols = [
@@ -38,10 +50,6 @@ export function exportCsv(reports: HazardReport[]) {
     "updated_at",
     "resolved_at",
   ];
-  const esc = (v: unknown) => {
-    const s = v == null ? "" : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
   const lines = [cols.join(",")];
   for (const r of reports) {
     lines.push(
@@ -66,11 +74,13 @@ export function exportCsv(reports: HazardReport[]) {
         r.updatedAt,
         r.resolvedAt ?? "",
       ]
-        .map(esc)
+        .map(csvCell)
         .join(","),
     );
   }
-  download(`sidequest-atx-reports-${stamp()}.csv`, new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" }));
+  // The byte-order mark tells Excel the file is UTF-8, so "·", "–" and
+  // accented street names survive the double-click open.
+  download(`sidequest-atx-reports-${stamp()}.csv`, new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" }));
 }
 
 export function toGeoJSON(reports: HazardReport[]): FeatureCollection {

@@ -1,8 +1,9 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { useKeepAwake } from "expo-keep-awake";
+import * as Linking from "expo-linking";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { classifierAvailable, classifyHazardPhoto } from "../ai/classify";
 import { collapseBatch, findDuplicates, likelyDuplicate } from "../ai/dedup";
@@ -24,12 +25,33 @@ import { loadDriveQueue, saveDriveQueue, type DriveFrame } from "./driveQueue";
 
 type Phase = "idle" | "capturing" | "processing" | "review" | "done";
 
-export function DriveScreen({ navigation }: ScreenProps<"Drive">) {
+export function DriveScreen({ navigation, route }: ScreenProps<"Drive">) {
   useKeepAwake();
   const session = useSession();
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>("idle");
-  const [camPerm, requestCam] = useCameraPermissions();
+  const [camPerm, requestCam, getCam] = useCameraPermissions();
+  const cameraOff = camPerm != null && !camPerm.granted;
+  /** iOS stops showing the prompt after a denial; then only the Settings app can turn the camera back on. */
+  const cameraBlocked = cameraOff && camPerm?.canAskAgain === false;
+  const askCamera = () => (cameraBlocked ? void Linking.openSettings() : void requestCam());
+
+  // Coming back from Settings with the camera switched on.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") void getCam?.();
+    });
+    return () => sub.remove();
+  }, [getCam]);
+
+  // Home's "Resume review" lands here with resume set: go straight to the unfinished drive.
+  const resumeRequested = route.params?.resume === true;
+  useEffect(() => {
+    if (!resumeRequested) return;
+    navigation.setParams({ resume: undefined });
+    if (loadDriveQueue()) resume();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeRequested]);
   const cam = useRef<CameraView>(null);
   const [camReady, setCamReady] = useState(false);
   const gps = useLiveGps(phase === "capturing");
@@ -113,7 +135,12 @@ export function DriveScreen({ navigation }: ScreenProps<"Drive">) {
     };
   }, [phase, intervalS]);
 
-  function begin() {
+  async function begin() {
+    if (!camPerm?.granted) {
+      if (cameraBlocked) return; // the notice above explains and opens Settings
+      const res = await requestCam();
+      if (!res.granted) return;
+    }
     setResumable(null);
     saveDriveQueue(null);
     setFrames([]);
@@ -284,7 +311,15 @@ export function DriveScreen({ navigation }: ScreenProps<"Drive">) {
               onChange={(k) => setIntervalS(Number(k) as 0 | 5 | 10)}
             />
           </Card>
-          <Button title="Start the drive" variant="primary" size="lg" block onPress={begin} />
+          {cameraOff ? (
+            <Notice tone="warn">
+              <P>
+                <Text style={{ fontWeight: "700" }}>Quest Drive needs the camera.</Text> {cameraBlocked ? "Camera access is off for SideQuest; turn it on in Settings." : "Allow camera access to take frames."}
+              </P>
+              <Button title={cameraBlocked ? "Open Settings" : "Allow camera"} size="sm" variant="primary" onPress={askCamera} />
+            </Notice>
+          ) : null}
+          <Button title="Start the drive" variant="primary" size="lg" block onPress={() => void begin()} />
           <Small>Drive captures are confirmed on foot before anything goes to 311.</Small>
         </Stack>
       </Screen>
@@ -295,13 +330,21 @@ export function DriveScreen({ navigation }: ScreenProps<"Drive">) {
     return (
       <View style={{ flex: 1, backgroundColor: C.black }}>
         <View style={{ flex: 1 }}>
-          {camPerm?.granted ? <CameraView ref={cam} style={StyleSheet.absoluteFill} facing="back" mode="picture" onCameraReady={() => setCamReady(true)} animateShutter={false} /> : null}
+          {camPerm?.granted ? (
+            <CameraView ref={cam} style={StyleSheet.absoluteFill} facing="back" mode="picture" onCameraReady={() => setCamReady(true)} animateShutter={false} />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", padding: SP.xl, gap: SP.md }]}>
+              <Text style={[T.h2, { color: C.inkOnDark, textAlign: "center" }]}>The camera is off.</Text>
+              <Text style={{ color: C.inkOnDarkSoft, textAlign: "center" }}>Quest Drive needs the camera to take frames. Nothing is being captured.</Text>
+              <Button title={cameraBlocked ? "Open Settings" : "Allow camera"} variant="primary" onPress={askCamera} />
+            </View>
+          )}
           {flash ? <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.5)" }]} /> : null}
           <View style={styles.hudTop}>
             <Row justify="space-between">
               <View style={styles.pill}>
-                {phase === "capturing" ? <View style={[styles.dot, { backgroundColor: C.sevSevere }]} /> : null}
-                <Text style={styles.pillText}>{phase === "capturing" ? "Capturing" : "Stopped"}</Text>
+                {phase === "capturing" && !cameraOff ? <View style={[styles.dot, { backgroundColor: C.sevSevere }]} /> : null}
+                <Text style={styles.pillText}>{phase === "capturing" ? (cameraOff ? "Camera off" : "Capturing") : "Stopped"}</Text>
               </View>
               <View style={styles.pill}>
                 <Text style={styles.pillText}>{miles.toFixed(2)} mi</Text>

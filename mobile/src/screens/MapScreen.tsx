@@ -5,10 +5,11 @@ import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { useSyncStatus } from "../data/sync";
 import { NW_AUSTIN } from "../data/places";
 import { useReports } from "../data/store";
+import { isOfflineError } from "../lib/friendlyError";
 import { photoUrl, supabase, SUPABASE_URL } from "../lib/supabase";
 import { C, SP } from "../theme";
 import { STATUS_LABELS, type HazardReport, type ReportStatus } from "../types";
-import { Notice, Screen, Segmented, Small } from "../ui";
+import { Button, Empty, Screen, Segmented, Small } from "../ui";
 
 /**
  * The shared map: every report from every reporter, drawn with the same olive
@@ -62,6 +63,8 @@ export function MapScreen() {
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? null);
   const [tokenMissing, setTokenMissing] = useState(false);
+  /** Why the token could not be read: "offline", or the backend is unreachable or not set up */
+  const [tokenError, setTokenError] = useState<"offline" | "unavailable" | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [ready, setReady] = useState(false);
   const web = useRef<WebView>(null);
@@ -105,10 +108,17 @@ export function MapScreen() {
   // token rotation reaches installed builds without a rebuild. A network
   // failure is NOT "token missing": it retries on the next focus.
   const fetchToken = useCallback(async () => {
-    const { data, error: err } = await supabase().from("sq_config").select("value").eq("key", "mapbox_public_token").maybeSingle();
-    if (err) return; // offline or table not bootstrapped yet — try again later
-    if (data?.value) setToken(data.value);
-    else setTokenMissing(true);
+    try {
+      const { data, error: err } = await supabase().from("sq_config").select("value").eq("key", "mapbox_public_token").maybeSingle();
+      if (err) throw err;
+      setTokenError(null);
+      if (data?.value) setToken(data.value);
+      else setTokenMissing(true);
+    } catch (e) {
+      // Offline, or the shared map isn't set up yet: say so instead of spinning forever.
+      console.warn("[map] token", e);
+      setTokenError(isOfflineError(e) ? "offline" : "unavailable");
+    }
   }, []);
 
   useEffect(() => {
@@ -165,13 +175,25 @@ export function MapScreen() {
 
   const html = useMemo(() => (token ? mapHtml(token) : null), [token]);
 
-  if (tokenMissing) {
+  if (!html && (tokenMissing || tokenError)) {
+    const offline = tokenError === "offline";
     return (
       <Screen>
-        <Notice tone="warn">
-          The map style needs a Mapbox token. Add a `mapbox_public_token` row to sq_config (or build with EXPO_PUBLIC_MAPBOX_TOKEN) and reopen
-          this tab.
-        </Notice>
+        <Empty
+          title={offline ? "You're offline." : "The map can't load yet."}
+          body={offline ? "The map needs a connection to load. Your reports are safe on this phone." : "SideQuest is still setting up the shared map. Your reports are safe on this phone."}
+          action={
+            <Button
+              title="Try again"
+              variant="primary"
+              onPress={() => {
+                setTokenMissing(false);
+                setTokenError(null);
+                void fetchToken();
+              }}
+            />
+          }
+        />
       </Screen>
     );
   }
@@ -191,7 +213,7 @@ export function MapScreen() {
         <Small style={{ color: C.inkMute }}>
           {merged.length} report{merged.length === 1 ? "" : "s"}
           {sync.pending > 0 ? ` · ${sync.pending} still uploading from this phone` : ""}
-          {error ? " · offline copy" : ""}
+          {error ? (isOfflineError(error) ? " · offline, showing this phone's reports" : " · couldn't reach the shared map") : ""}
         </Small>
       </View>
       {html ? (

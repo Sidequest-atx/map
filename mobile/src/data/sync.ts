@@ -215,6 +215,10 @@ async function pushOne(r: HazardReport, uid: string, name: string, remoteIdByLoc
     row.after_photo_path = await uploadPhoto(uid, r.afterPhotoUri, `${r.id}.after.jpg`);
   }
 
+  // The photo uploads can take a while; if the account changed meanwhile, the
+  // row waits for its owner's next pass instead of going up under this id.
+  if (getSession()?.userId !== uid) throw new Error("signed out during upload");
+
   const syncedAt = new Date().toISOString();
   const { data, error } = await sb.from("sq_reports").upsert(row, { onConflict: "client_id" }).select("id, ref").single();
   if (error) throw new Error(error.message);
@@ -362,6 +366,8 @@ export async function syncNow(): Promise<void> {
     .filter((r) => isDirty(r) && r.ownerId === uid)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   for (const r of dirty) {
+    // Signed out, or someone else signed in, mid-pass: nothing more goes up under this id.
+    if (getSession()?.userId !== uid) break;
     try {
       await pushOne(r, uid, session.name, remoteIdByLocal);
     } catch (e) {

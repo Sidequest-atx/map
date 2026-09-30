@@ -181,6 +181,14 @@ export function ReportFlowScreen({ navigation }: ScreenProps<"Report">) {
   }
 
   async function pickFromLibrary() {
+    try {
+      await pickFromLibraryUnsafe();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not open your photos.");
+    }
+  }
+
+  async function pickFromLibraryUnsafe() {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], exif: true, quality: 1, allowsMultipleSelection: false });
     if (res.canceled || !res.assets[0]) return;
     const a = res.assets[0];

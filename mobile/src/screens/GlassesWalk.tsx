@@ -116,7 +116,18 @@ export function GlassesWalkScreen({ navigation }: ScreenProps<"GlassesWalk">) {
       if (!walk) return;
       setFindNote(null);
       const startMs = new Date(walk.startedAt).getTime();
-      const res = await findWalkPhotos(t, { startMs, endMs }, getPrefs().glassesClockOffsetS);
+      // A Photos query that throws must still land on review, where Discard
+      // and the manual picker are; otherwise the spinner has no way out.
+      let res: Awaited<ReturnType<typeof findWalkPhotos>>;
+      try {
+        res = await findWalkPhotos(t, { startMs, endMs }, getPrefs().glassesClockOffsetS);
+      } catch {
+        setFindNeedsSettings(false);
+        setFindNote("Couldn't read your camera roll. Pick the photos by hand, or discard the walk.");
+        setCandidates([]);
+        setPhase("review");
+        return;
+      }
       setFindNeedsSettings(!res.ok && Boolean(res.needsSettings));
       if (!res.ok) {
         setFindNote(res.reason);

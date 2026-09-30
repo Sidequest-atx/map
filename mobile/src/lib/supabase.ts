@@ -18,9 +18,37 @@ export const SUPABASE_URL = URL;
 
 let client: SupabaseClient | null = null;
 
+/** Photo uploads ride a slow uplink; everything else is a small JSON call. */
+const TIMEOUT_MS = 30_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
+
+/**
+ * No request may hang forever: a stalled connection otherwise leaves the
+ * sign-in button, the sync pass and the map token waiting with no way out.
+ * The abort surfaces as a network failure, which every caller already handles.
+ */
+export const timedFetch: typeof fetch = (input, init) => {
+  const url = typeof input === "string" ? input : "url" in input ? input.url : String(input);
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), url.includes("/storage/v1/object/") ? UPLOAD_TIMEOUT_MS : TIMEOUT_MS);
+  const outer = init?.signal;
+  if (outer) {
+    if (outer.aborted) ctl.abort();
+    else outer.addEventListener("abort", () => ctl.abort(), { once: true });
+  }
+  // Return fetch's own promise: the abort above is what ends a stalled request.
+  const request = fetch(input, { ...init, signal: ctl.signal });
+  request.then(
+    () => clearTimeout(timer),
+    () => clearTimeout(timer),
+  );
+  return request;
+};
+
 export function supabase(): SupabaseClient {
   if (!client) {
     client = createClient(URL, ANON, {
+      global: { fetch: timedFetch },
       auth: {
         storage: AsyncStorage,
         storageKey: "sidequest-atx-auth",

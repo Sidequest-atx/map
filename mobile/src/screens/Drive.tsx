@@ -66,6 +66,7 @@ export function DriveScreen({ navigation, route }: ScreenProps<"Drive">) {
   const capturing = useRef(false);
   const frameCount = useRef(0);
   const captureTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const skipAi = useRef(false);
 
   useEffect(() => {
     if (camPerm && !camPerm.granted && camPerm.canAskAgain) void requestCam();
@@ -178,15 +179,20 @@ export function DriveScreen({ navigation, route }: ScreenProps<"Drive">) {
     setProgress(0);
     const out: DriveFrame[] = [];
     const useAi = classifierAvailable();
+    skipAi.current = false;
+    // Two misses in a row means the classifier is unreachable; waiting out the
+    // timeout on every remaining frame would hold the captain for minutes.
+    let misses = 0;
     for (let i = 0; i < input.length; i++) {
       const f = input[i];
       let ai = f.ai;
-      if (useAi && ai === undefined) {
+      if (useAi && ai === undefined && !skipAi.current && misses < 2) {
         try {
           ai = await classifyHazardPhoto(await readBase64(f.photoUri));
         } catch {
           ai = null;
         }
+        misses = ai ? 0 : misses + 1;
       }
       out.push({ ...f, ai: ai ?? null, type: f.type ?? ai?.label ?? "crack", severity: f.severity ?? ai?.severity ?? "moderate" });
       setProgress((i + 1) / input.length);
@@ -400,6 +406,7 @@ export function DriveScreen({ navigation, route }: ScreenProps<"Drive">) {
               </Row>
               <ActivityIndicator color={C.olive600} />
               <Small>Duplicates get removed next. Nothing is posted yet.</Small>
+              {classifierAvailable() ? <Button title="Skip to review" variant="ghost" size="sm" onPress={() => (skipAi.current = true)} /> : null}
             </Card>
           )}
         </View>

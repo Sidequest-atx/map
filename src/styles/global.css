@@ -990,6 +990,17 @@ ol {
   align-items: center;
   font-size: 0.85rem;
   color: var(--ink-soft);
+  min-width: 0;
+}
+/* a long moderator name gives way, so the bar never widens the page on a phone */
+.app-bar-right > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-bar-right .btn {
+  flex: none;
 }
 .app-main {
   flex: 1;

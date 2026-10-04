@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { requestPasswordReset, resetPasswordWithCode, signInDemo, signInWithPassword, signOut, useSession, type Session } from "../../data/session";
 import { friendlyAuthError } from "../../lib/authErrors";
@@ -28,6 +28,7 @@ function RealSignIn({ dest }: { dest: string }) {
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -46,7 +47,10 @@ function RealSignIn({ dest }: { dest: string }) {
 
   async function run(e: FormEvent, fn: () => Promise<void>) {
     e.preventDefault();
-    if (busy) return;
+    // A second click can land before the re-render that disables the button,
+    // so the guard is a ref (set at once), not the busy state.
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -56,6 +60,7 @@ function RealSignIn({ dest }: { dest: string }) {
       console.warn("[SideQuest] auth:", err);
       setError(friendlyAuthError(err));
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }

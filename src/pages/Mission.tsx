@@ -5,7 +5,7 @@ import { CountUp } from "../components/CountUp";
 import { Still } from "../components/Media";
 import { useReports } from "../data/store";
 import { fmtInt } from "../lib/format";
-import { MEDIA, type StillId } from "../lib/media";
+import { HERO, type StillId } from "../lib/media";
 import { staticMapUrl, useMapboxToken } from "../lib/mapToken";
 
 /**
@@ -76,7 +76,7 @@ export default function Mission() {
           <p>
             This is the City's own map of one Northwest Austin neighborhood: in 2020 its assessors rated 2,580 of the 5,923 sidewalk segments
             here functionally deficient. The City can price the entire fix and still can't name the slab that breaks the next hip. SideQuest ATX
-            is a student-run map of the same streets, built one photographed panel at a time, and every report stays open until a second photo
+            is a volunteer-run map of the same streets, built one photographed panel at a time, and every report stays open until a second photo
             proves the repair.
           </p>
           <div className="stats">
@@ -343,7 +343,7 @@ function Hero() {
     <section className="hero" aria-labelledby="hero-title">
       <div className="hero-media" aria-hidden>
         <img
-          src={MEDIA.hero.poster}
+          src={HERO.poster}
           alt=""
           className={posterMissing ? "is-missing" : undefined}
           fetchPriority="high"
@@ -358,12 +358,12 @@ function Hero() {
           loop
           playsInline
           preload="metadata"
-          poster={posterMissing ? undefined : MEDIA.hero.poster}
+          poster={posterMissing ? undefined : HERO.poster}
           onCanPlay={() => setReady(true)}
           onPlaying={() => setReady(true)}
         >
-          <source src={MEDIA.hero.webm} type="video/webm" />
-          <source src={MEDIA.hero.mp4} type="video/mp4" />
+          <source src={HERO.webm} type="video/webm" />
+          <source src={HERO.mp4} type="video/mp4" />
         </video>
       </div>
       <div className="hero-scrim" aria-hidden />

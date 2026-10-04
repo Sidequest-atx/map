@@ -103,17 +103,30 @@ interface EBProps {
 }
 interface EBState {
   error: Error | null;
+  offline: boolean;
 }
 export class ErrorBoundary extends Component<EBProps, EBState> {
-  state: EBState = { error: null };
-  static getDerivedStateFromError(error: Error): EBState {
-    return { error };
+  state: EBState = { error: null, offline: false };
+  static getDerivedStateFromError(error: Error): Partial<EBState> {
+    return { error, offline: isChunkLoadError(error) && navigator.onLine === false };
+  }
+  // A page whose code never reached this device can't load offline, and
+  // reloading then would only swap this message for a blank screen. Wait for
+  // the connection and reload once it is back.
+  private onOnline = () => {
+    if (this.state.error && isChunkLoadError(this.state.error)) location.reload();
+  };
+  componentDidMount() {
+    window.addEventListener("online", this.onOnline);
+  }
+  componentWillUnmount() {
+    window.removeEventListener("online", this.onOnline);
   }
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[SideQuest] render error", error, info.componentStack);
     // React caches a failed lazy import, so re-rendering can't fix it; a new
     // deploy needs a fresh page. Reload once, at most once a minute.
-    if (isChunkLoadError(error)) {
+    if (isChunkLoadError(error) && navigator.onLine !== false) {
       try {
         const last = Number(sessionStorage.getItem(RELOAD_KEY) || 0);
         if (Date.now() - last > 60_000) {
@@ -126,21 +139,27 @@ export class ErrorBoundary extends Component<EBProps, EBState> {
     }
   }
   componentDidUpdate(prev: EBProps) {
-    if (this.state.error && prev.resetKey !== this.props.resetKey) this.setState({ error: null });
+    if (this.state.error && prev.resetKey !== this.props.resetKey) this.setState({ error: null, offline: false });
   }
   render() {
-    const { error } = this.state;
+    const { error, offline } = this.state;
     if (!error) return this.props.children;
     const home = this.props.home ?? "/";
     const chunk = isChunkLoadError(error);
+    const title = offline ? "You're offline." : chunk ? "This page couldn't load." : "Something broke on this screen.";
+    const body = offline
+      ? "This page hasn't been saved on this device yet. It opens by itself when you're back online."
+      : chunk
+        ? "The connection may have dropped, or SideQuest was just updated. Reload to try again."
+        : "Try again, or go back to the start.";
     return (
       <div className="errorpage ui">
         <div>
-          <h1 className="h2">{chunk ? "SideQuest was just updated." : "Something broke on this screen."}</h1>
-          <p className="muted">{chunk ? "Reload to get the new version." : "Try again, or go back to the start."}</p>
+          <h1 className="h2">{title}</h1>
+          <p className="muted">{body}</p>
           {!chunk && <p className="mono small muted">{error.message}</p>}
           <div className="btn-row">
-            <button className="btn btn--primary" onClick={() => (chunk ? location.reload() : this.setState({ error: null }))}>
+            <button className="btn btn--primary" onClick={() => (chunk ? location.reload() : this.setState({ error: null, offline: false }))}>
               {chunk ? "Reload" : "Try again"}
             </button>
             <a className="btn" href={home}>

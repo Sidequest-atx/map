@@ -37,7 +37,7 @@ export function SiteLayout() {
       </a>
       <div className="utilbar">
         <div className="wrap utilbar-inner">
-          <span className="utilbar-tag">A living public map of Austin's sidewalks · Student-run, Northwest Austin</span>
+          <span className="utilbar-tag">A living public map of Austin's sidewalks · Northwest Austin</span>
           <nav className="utilbar-links" aria-label="Utility">
             <Link to="/app/signin">Moderator sign-in</Link>
             <a href={`mailto:${CONTACT_EMAIL}`}>Contact</a>
@@ -124,7 +124,7 @@ export function SiteLayout() {
                 <h2 className="footer-h">Organization</h2>
                 <ul>
                   <li>Founded 2026, Northwest Austin</li>
-                  <li>Student-led, open data, built to outlive its founders</li>
+                  <li>Volunteer-led, open data, built to last</li>
                   <li>
                     <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
                   </li>

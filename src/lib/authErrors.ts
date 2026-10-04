@@ -9,14 +9,20 @@ export function isNetworkError(e: unknown): boolean {
   const x = (e ?? {}) as ErrLike;
   if (x.name === "AuthRetryableFetchError") return true;
   const msg = e instanceof Error ? e.message : typeof e === "string" ? e : (x.message ?? "");
-  if (/failed to fetch|networkerror|network request failed|load failed|fetch failed/i.test(msg)) return true;
+  if (/failed to fetch|networkerror|network request failed|load failed|fetch failed|abort/i.test(msg)) return true;
   return typeof navigator !== "undefined" && navigator.onLine === false;
 }
 
 export function friendlyAuthError(e: unknown): string {
-  if (isNetworkError(e)) return "Can't reach SideQuest right now. Check your connection and try again.";
   const x = (e ?? {}) as ErrLike;
+  // Proxies and rate limiters answer in plain text: a status, no code
+  // (supabase-js keeps that response as the error's originalError). A 5xx
+  // also arrives as a "retryable fetch" error, but the connection is fine.
+  const status = x.status ?? (e as { originalError?: { status?: number } } | null)?.originalError?.status ?? 0;
+  if (!x.code && status >= 500) return "SideQuest's server is having trouble. Try again in a few minutes.";
+  if (isNetworkError(e)) return "Can't reach SideQuest right now. Check your connection and try again.";
   if (x.name === "AuthWeakPasswordError") return "Choose a longer password: at least 8 characters.";
+  if (!x.code && status === 429) return "Too many tries. Wait a minute, then try again.";
   switch (x.code) {
     case "invalid_credentials":
       return "That email and password don't match. Check for typos, or reset your password.";

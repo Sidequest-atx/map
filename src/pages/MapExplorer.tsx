@@ -81,13 +81,17 @@ export default function MapExplorer() {
     setHideResolved(true);
   };
 
-  // Escape closes the detail
+  // Escape closes the detail first, then the filter panel.
   useEffect(() => {
-    if (!selected) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && select(null);
+    if (!selected && !panelOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (selected) select(null);
+      else setPanelOpen(false);
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selected, select]);
+  }, [selected, panelOpen, select]);
 
   const { token, missing } = useMapboxToken();
   const canMap = Boolean(token) && !mapFailed;

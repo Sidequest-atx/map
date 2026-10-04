@@ -7,9 +7,18 @@
    deploy retires the previous cache. */
 const VERSION = "sq-__SW_BUILD_ID__";
 const SHELL = ["/", "/app", "/manifest.webmanifest", "/favicon.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
+// The entry script, its CSS and the light public pages, filled in at build
+// time. A first visit loads before this worker exists, so without this list an
+// offline reload finds the page but not its script and renders nothing.
+const PRECACHE = /*__SW_PRECACHE__*/ [];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches
+      .open(VERSION)
+      .then((c) => c.addAll(SHELL).then(() => Promise.all(PRECACHE.map((u) => c.add(u).catch(() => undefined)))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (e) => {

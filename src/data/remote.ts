@@ -141,6 +141,13 @@ export class SupabaseStore implements ReportStore {
         if (document.visibilityState === "visible") void this.refresh();
       });
     }
+    // A load that failed while offline would otherwise sit on its error until
+    // someone pressed Try again. Nothing is refetched if the last load worked.
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", () => {
+        if (!this.state.loaded || this.state.error) void this.refresh();
+      });
+    }
   }
 
   async refresh(): Promise<void> {

@@ -1,7 +1,7 @@
 # SideQuest ATX
 
 ## What it is
-A civic product that photographs every broken, blocked, or missing sidewalk in Austin, turns the photos into a living public map, and tracks each hazard until a second photo proves it is fixed. Student-run, Northwest Austin, 2026 through 2031 and beyond.
+A civic product that photographs every broken, blocked, or missing sidewalk in Austin, turns the photos into a living public map, and tracks each hazard until a second photo proves it is fixed. Volunteer-run, starting in Northwest Austin, founded 2026. Internal only: this is a college non-profit, and no public surface (site, app, README, media) mentions or hints at students, school or college.
 
 ## Who it is for
 - Public viewers (neighbors, council offices, the City's Sidewalk Program, researchers)

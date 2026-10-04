@@ -2,7 +2,7 @@
 
 **Photograph every broken, blocked, or missing sidewalk in Austin, turn the photos into a living public map, and do not stop until the hazard is actually gone.**
 
-SideQuest ATX is a student-run civic project based in Northwest Austin, running from 2026 through 2031 and designed to outlive its founders. Neighbors photograph hazards from a phone; computer vision classifies, deduplicates, ranks, and verifies them; the map becomes the city's repair queue; and nothing is marked resolved without a second photo.
+SideQuest ATX is a volunteer-run civic project based in Northwest Austin, founded in 2026. Neighbors photograph hazards from a phone; computer vision classifies, deduplicates, ranks, and verifies them; the map becomes the city's repair queue; and nothing is marked resolved without a second photo.
 
 > No one's grandmother should be injured by a sidewalk a photograph could have fixed.
 

@@ -9,7 +9,16 @@ import { isAuthError, isAuthRetryableFetchError } from "@supabase/supabase-js";
 
 export type AuthContext = "signup" | "signin" | "reset-request" | "reset-confirm";
 
-const OFFLINE = /network request failed|failed to fetch|network error|internet connection|timed out|load failed/i;
+const OFFLINE = /network request failed|failed to fetch|network error|internet connection|timed out|load failed|abort/i;
+
+/** Proxies and rate limiters answer in plain text, so there is a status and no
+    code; supabase-js keeps that response as the error's originalError. */
+function statusOf(e: unknown): number {
+  if (!e || typeof e !== "object") return 0;
+  const x = e as { status?: unknown; originalError?: { status?: unknown } };
+  const s = typeof x.status === "number" ? x.status : x.originalError?.status;
+  return typeof s === "number" ? s : 0;
+}
 
 function codeOf(e: unknown): string {
   if (e && typeof e === "object" && "code" in e) {
@@ -31,6 +40,8 @@ export function isOfflineError(e: unknown): boolean {
 }
 
 export function friendlyAuthError(e: unknown, context: AuthContext = "signin"): string {
+  // A 5xx arrives as a "retryable fetch" error too, but the phone is online.
+  if (statusOf(e) >= 500) return "SideQuest's server is having trouble. Try again in a few minutes.";
   if (isOfflineError(e)) return "No connection. Check your signal and try again.";
   // Our own sign-up outcome when email confirmation is switched on: already plain.
   if (e instanceof Error && e.name === "ConfirmEmailPending") return e.message;
@@ -62,6 +73,7 @@ export function friendlyAuthError(e: unknown, context: AuthContext = "signin"): 
     case "otp_disabled":
       return "Password reset isn't available right now. Try again later.";
   }
+  if (statusOf(e) === 429) return "Too many tries. Wait a minute, then try again.";
   if (context === "reset-confirm" && isAuthError(e)) return "That code didn't work. Check it, or ask for a new one.";
   return "Something went wrong. Try again in a moment.";
 }

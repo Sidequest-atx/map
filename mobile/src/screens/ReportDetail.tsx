@@ -142,7 +142,7 @@ export function ReportDetailScreen({ route, navigation }: ScreenProps<"ReportDet
           <Row>
             <Button title="Open in Maps" size="sm" onPress={openInMaps} />
             <Button title="Check GPS tag" size="sm" onPress={() => void checkExif()} />
-            {r.photoUri ? <Button title="Share photo" size="sm" onPress={() => void sharePhoto(r.photoUri!, r.ref)} /> : null}
+            {r.photoUri ? <Button title="Share photo" size="sm" onPress={() => void sharePhoto(r.photoUri!, r.ref).catch((e) => Alert.alert("Could not share the photo", e instanceof Error ? e.message : String(e)))} /> : null}
           </Row>
           {exifCheck ? <Small style={{ color: C.olive800 }}>{exifCheck}</Small> : null}
         </Card>

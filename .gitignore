@@ -23,5 +23,10 @@ render/gis/anderson_mill/
 # Stock aerial clips trialled and dropped (opt-in ?film=1 only)
 public/prologue/
 render/*.blend*
+# Runway pipeline: source photos (GPS in EXIF) and takes stay local;
+# only published clips in public/media/runway are tracked
+runway/photos/*
+!runway/photos/.gitkeep
+runway/work/
 __pycache__/
 *.pyc

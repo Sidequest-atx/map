@@ -1,0 +1,66 @@
+{
+  "defaults": {
+    "draftModel": "gen4_turbo",
+    "finalModel": "gen4.5",
+    "duration": 5
+  },
+  "shots": [
+    {
+      "id": "hero",
+      "slot": "hero",
+      "photo": "hero.jpg",
+      "ratio": "1280:720",
+      "duration": 10,
+      "alt": "A low, slow move along a lifted sidewalk panel on a Northwest Austin street in morning light.",
+      "prompt": "Slow, steady push-in low along the sidewalk toward the lifted panel. Camera otherwise locked, no shake. Soft morning light, leaves move slightly in a light breeze. The concrete, cracks and panel edges stay exactly as they are. No people, no vehicles moving."
+    },
+    {
+      "id": "missing",
+      "slot": "stills.missing",
+      "photo": "missing.jpg",
+      "ratio": "1104:832",
+      "alt": "A sidewalk that ends in worn dirt and grass, with the street running on beside it.",
+      "prompt": "Very slow push-in toward the point where the sidewalk ends. Camera otherwise locked. Grass moves slightly in a light breeze. The pavement and ground stay exactly as they are. No people, no vehicles moving."
+    },
+    {
+      "id": "broken",
+      "slot": "stills.broken",
+      "photo": "broken.jpg",
+      "ratio": "1104:832",
+      "alt": "A concrete sidewalk panel cracked through and lifted at one edge.",
+      "prompt": "Very slow push-in toward the cracked, lifted panel. Camera otherwise locked. Light shifts gently as if a cloud passes. The concrete and cracks stay exactly as they are. No people, no vehicles moving."
+    },
+    {
+      "id": "falls",
+      "slot": "stills.falls",
+      "photo": "falls.jpg",
+      "ratio": "1104:832",
+      "alt": "Tree roots heaving two sidewalk panels out of level.",
+      "prompt": "Slow lateral slide to the right past the root-heaved panels, small parallax. Camera height fixed. Dappled tree shade moves slightly. The concrete and roots stay exactly as they are. No people, no vehicles moving."
+    },
+    {
+      "id": "hedge",
+      "slot": "clips.hedge",
+      "photo": "hedge.jpg",
+      "ratio": "1104:832",
+      "alt": "A hedge grown across half the width of a sidewalk.",
+      "prompt": "Very slow push-in along the sidewalk toward the overgrown hedge. Camera otherwise locked. Leaves move slightly in a light breeze. The sidewalk stays exactly as it is. No people, no vehicles moving."
+    },
+    {
+      "id": "social-hedge",
+      "slot": "social",
+      "photo": "hedge.jpg",
+      "ratio": "720:1280",
+      "alt": "Vertical clip of a hedge grown across a sidewalk.",
+      "prompt": "Very slow push-in along the sidewalk toward the overgrown hedge. Camera otherwise locked. Leaves move slightly in a light breeze. No people, no vehicles moving."
+    },
+    {
+      "id": "social-panel",
+      "slot": "social",
+      "photo": "broken.jpg",
+      "ratio": "720:1280",
+      "alt": "Vertical clip of a cracked, lifted sidewalk panel.",
+      "prompt": "Very slow push-in toward the cracked, lifted panel. Camera otherwise locked. The concrete and cracks stay exactly as they are. No people, no vehicles moving."
+    }
+  ]
+}

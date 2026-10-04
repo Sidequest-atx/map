@@ -1,13 +1,17 @@
 /**
- * The landing's photography. Two sources, both about this city:
+ * The landing's photography. Three sources, all about this city:
  * - real: USDA NAIP 2022 orthoimagery (public domain) of the Anderson Mill /
  *   Westwood neighborhood, and the City of Austin's own sidewalk assessment
  *   drawn over it (City of Austin Open Data, dataset vchz-d9ng);
  * - rendered: path-traced close-ups of the project's street model
- *   (render/ in the repo), showing the exact defects the copy describes.
+ *   (render/ in the repo), showing the exact defects the copy describes;
+ * - AI-assisted: Runway clips made from the project's own photos (runway/
+ *   in the repo), which replace a slot only once published.
  * Files live in public/media; a missing file degrades to a quiet olive
  * panel rather than a broken image. Alt text is written as a caption.
  */
+import runway from "./media.runway.json";
+
 export const MEDIA = {
   hero: {
     mp4: "/media/hero.mp4",
@@ -69,3 +73,21 @@ export const MEDIA = {
 } as const;
 
 export type StillId = keyof typeof MEDIA.stills;
+
+/**
+ * Runway clips published over a slot by `node runway/cli.mjs publish`. The
+ * file is `{}` until then, and everything above is what the site shows.
+ */
+export interface Clip {
+  mp4: string;
+  webm: string;
+  poster: string;
+  alt?: string;
+}
+const RUNWAY: Record<string, Clip | undefined> = runway;
+
+export const HERO: Clip & { alt: string } = { ...MEDIA.hero, ...RUNWAY.hero };
+
+export function stillClip(id: StillId): Clip | undefined {
+  return RUNWAY[`stills.${id}`];
+}
